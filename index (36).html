@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Examination Result Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16233d;
+  --ink-2:#223655;
+  --paper:#faf6ec;
+  --paper-2:#f2ead6;
+  --rule:#cbbfa0;
+  --brass:#b8863b;
+  --brass-deep:#8c631f;
+  --pass:#2f6f4f;
+  --fail:#a13a2e;
+  --absent:#6b6357;
+  --text:#232323;
+  --text-soft:#5c554a;
+  --serif:'Source Serif 4', Georgia, serif;
+  --sans:'Inter', system-ui, sans-serif;
+  --mono:'IBM Plex Mono', monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:var(--sans);
+  background:var(--ink);
+  color:var(--text);
+  min-height:100vh;
+}
+.app{
+  max-width:1180px;
+  margin:0 auto;
+  min-height:100vh;
+  background:var(--paper);
+  box-shadow:0 0 60px rgba(0,0,0,.35);
+  position:relative;
+}
+/* ---------- Top ribbon ---------- */
+.ribbon{
+  background:var(--ink);
+  color:var(--paper);
+  padding:18px 32px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:3px solid var(--brass);
+}
+.ribbon .brand{display:flex;align-items:center;gap:12px;}
+.ribbon .seal{
+  width:38px;height:38px;border-radius:50%;
+  border:2px solid var(--brass);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--serif); font-weight:700; color:var(--brass); font-size:15px;
+}
+.ribbon h1{font-family:var(--serif); font-weight:600; font-size:19px; margin:0; letter-spacing:.2px;}
+.ribbon .sub{font-family:var(--mono); font-size:11px; color:var(--brass); opacity:.85; letter-spacing:.08em;}
+.ribbon nav{display:flex; gap:10px;}
+.ribbon nav button{
+  background:transparent; border:1px solid rgba(250,246,236,.35); color:var(--paper);
+  font-family:var(--sans); font-size:12.5px; padding:8px 14px; border-radius:2px; cursor:pointer;
+  letter-spacing:.03em;
+}
+.ribbon nav button:hover{border-color:var(--brass); color:var(--brass);}
+
+/* ---------- Generic screen ---------- */
+.screen{padding:40px 48px 64px;}
+.eyebrow{
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--brass-deep); margin-bottom:6px;
+}
+h2.title{font-family:var(--serif); font-size:30px; font-weight:700; margin:0 0 6px; color:var(--ink);}
+p.lede{color:var(--text-soft); margin:0 0 32px; max-width:640px; line-height:1.55;}
+
+/* ---------- Home: group index cards ---------- */
+.index-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:18px;
+}
+.index-card{
+  position:relative;
+  background:var(--paper);
+  border:1px solid var(--rule);
+  border-left:6px solid var(--brass);
+  padding:20px 20px 22px;
+  cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease, border-left-color .15s ease;
+}
+.index-card:hover{
+  transform:translateY(-3px);
+  box-shadow:0 10px 24px rgba(22,35,61,.18);
+  border-left-color:var(--ink);
+}
+.index-card .code{
+  font-family:var(--mono); font-size:11px; color:var(--brass-deep); letter-spacing:.06em;
+}
+.index-card h3{
+  font-family:var(--serif); font-size:19px; margin:6px 0 10px; color:var(--ink); line-height:1.25;
+}
+.index-card .count{font-size:12.5px; color:var(--text-soft);}
+.index-card .arrow{position:absolute; right:16px; bottom:16px; color:var(--rule); font-size:18px;}
+
+/* ---------- Choice cards (mode / subject picks) ---------- */
+.choice-row{display:flex; gap:18px; flex-wrap:wrap;}
+.choice-card{
+  flex:1 1 260px;
+  background:var(--paper); border:1px solid var(--rule); padding:24px;
+  cursor:pointer; transition:box-shadow .15s ease, border-color .15s ease;
+}
+.choice-card:hover{border-color:var(--brass); box-shadow:0 8px 20px rgba(22,35,61,.14);}
+.choice-card .tag{font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--brass-deep);}
+.choice-card h3{font-family:var(--serif); font-size:20px; margin:8px 0 8px; color:var(--ink);}
+.choice-card p{margin:0; font-size:13.5px; color:var(--text-soft); line-height:1.5;}
+
+.subject-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px;}
+.subject-chip{
+  background:var(--paper); border:1px solid var(--rule); padding:16px;
+  font-family:var(--serif); font-size:16px; color:var(--ink); cursor:pointer; text-align:center;
+}
+.subject-chip:hover{background:var(--paper-2); border-color:var(--brass);}
+.subject-chip small{display:block; font-family:var(--mono); font-size:10.5px; color:var(--text-soft); margin-top:6px; letter-spacing:.03em;}
+
+/* ---------- Login ---------- */
+.login-box{max-width:380px; background:var(--paper); border:1px solid var(--rule); padding:32px; margin:0 auto;}
+.login-box .crest{text-align:center; margin-bottom:18px;}
+.login-box .crest .seal2{
+  width:56px;height:56px;border-radius:50%; margin:0 auto 8px; border:2px solid var(--brass);
+  display:flex;align-items:center;justify-content:center; font-family:var(--serif); color:var(--brass); font-size:22px; font-weight:700;
+}
+label{display:block; font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-soft); margin:14px 0 6px;}
+input[type=text],input[type=password],input[type=number]{
+  width:100%; padding:11px 12px; border:1px solid var(--rule); background:#fff; font-family:var(--sans); font-size:14px;
+}
+input:focus{outline:2px solid var(--brass); outline-offset:1px;}
+.btn{
+  font-family:var(--sans); font-weight:600; font-size:13.5px; letter-spacing:.02em;
+  background:var(--ink); color:var(--paper); border:none; padding:12px 22px; cursor:pointer;
+  border-bottom:3px solid var(--brass);
+}
+.btn:hover{background:var(--ink-2);}
+.btn.secondary{background:transparent; color:var(--ink); border:1px solid var(--rule); border-bottom:1px solid var(--rule);}
+.btn.secondary:hover{border-color:var(--ink);}
+.btn-row{margin-top:20px; display:flex; gap:10px;}
+.error-msg{color:var(--fail); font-size:13px; margin-top:10px; font-family:var(--sans);}
+.back-link{
+  font-family:var(--mono); font-size:12px; color:var(--text-soft); cursor:pointer; display:inline-block; margin-bottom:22px;
+  letter-spacing:.03em;
+}
+.back-link:hover{color:var(--brass-deep);}
+
+/* ---------- Marks entry ledger ---------- */
+.ledger-meta{display:flex; gap:24px; margin-bottom:22px; flex-wrap:wrap;}
+.ledger-meta div{font-size:13px;}
+.ledger-meta .k{font-family:var(--mono); font-size:10.5px; text-transform:uppercase; color:var(--brass-deep); letter-spacing:.08em; display:block;}
+.autofill-bar{
+  display:flex; align-items:center; gap:10px; margin-bottom:18px; padding:12px 16px;
+  background:var(--paper-2); border:1px dashed var(--rule); font-size:13px;
+}
+table.ledger{width:100%; border-collapse:collapse; font-size:14px; background:#fff;}
+table.ledger thead th{
+  font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+  background:var(--ink); color:var(--paper); padding:10px 8px; text-align:center; border-right:1px solid rgba(250,246,236,.15);
+}
+table.ledger tbody td{
+  padding:7px 8px; border-bottom:1px solid var(--rule); border-right:1px solid #eee2c8; text-align:center;
+}
+table.ledger tbody tr:nth-child(odd){background:#fffdf8;}
+table.ledger td.name-cell{text-align:left; font-family:var(--sans); font-size:13.5px;}
+table.ledger td.reg-cell{font-family:var(--mono); font-size:12.5px;}
+table.ledger input{
+  width:64px; text-align:center; padding:6px 4px; border:1px solid var(--rule); font-family:var(--mono); font-size:13px;
+}
+table.ledger input:focus{outline:2px solid var(--brass);}
+.submit-bar{margin-top:24px; display:flex; align-items:center; gap:16px;}
+.status-msg{font-size:13.5px; font-family:var(--mono);}
+.status-msg.ok{color:var(--pass);}
+.status-msg.err{color:var(--fail);}
+.result-tag{
+  font-family:var(--mono); font-weight:700; font-size:10.5px; letter-spacing:.03em;
+  padding:3px 8px; border-radius:2px; display:inline-block;
+}
+.result-tag.PASS{color:var(--pass); background:rgba(47,111,79,.1);}
+.result-tag.FAIL{color:var(--fail); background:rgba(161,58,46,.1);}
+.result-tag.ABSENT{color:var(--absent); background:rgba(107,99,87,.1);}
+.result-tag.PENDING{color:var(--text-soft); background:rgba(92,85,74,.08);}
+
+/* ---------- Analysis ---------- */
+.stat-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:32px;}
+.stat-card{background:var(--paper); border:1px solid var(--rule); border-top:3px solid var(--brass); padding:16px;}
+.stat-card .num{font-family:var(--serif); font-size:28px; color:var(--ink); font-weight:700;}
+.stat-card .lbl{font-family:var(--mono); font-size:10.5px; text-transform:uppercase; color:var(--text-soft); letter-spacing:.05em; margin-top:4px;}
+.section-block{margin-bottom:44px;}
+.section-block h3{font-family:var(--serif); font-size:21px; color:var(--ink); margin:0 0 4px; border-bottom:2px solid var(--brass); padding-bottom:8px;}
+.section-block .note{font-size:12.5px; color:var(--text-soft); margin:6px 0 16px;}
+.table-wrap{overflow-x:auto;}
+table.report{width:100%; border-collapse:collapse; font-size:13px; background:#fff; min-width:640px;}
+table.report th{background:var(--ink); color:var(--paper); padding:8px 10px; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; text-align:center;}
+table.report td{padding:7px 10px; border-bottom:1px solid var(--rule); text-align:center;}
+table.report tbody tr:nth-child(odd){background:#fffdf8;}
+table.report td.left{text-align:left;}
+
+.stamp{
+  display:inline-flex; align-items:center; justify-content:center;
+  font-family:var(--serif); font-weight:700; font-size:11px; letter-spacing:.05em;
+  border-radius:50%; width:58px; height:30px; border-radius:4px;
+  border:2px solid; padding:2px 6px;
+}
+.stamp.PASS{color:var(--pass); border-color:var(--pass);}
+.stamp.FAIL{color:var(--fail); border-color:var(--fail);}
+.stamp.ABSENT{color:var(--absent); border-color:var(--absent);}
+.stamp.PENDING{color:var(--text-soft); border-color:var(--rule);}
+
+.group-select-row{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:28px;}
+.group-select-row button{
+  font-family:var(--mono); font-size:12.5px; padding:9px 16px; background:#fff; border:1px solid var(--rule); cursor:pointer;
+}
+.group-select-row button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+
+.loading{font-family:var(--mono); font-size:13px; color:var(--text-soft); padding:20px 0;}
+footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-top:1px solid var(--rule); font-family:var(--mono);}
+
+/* ---------- Home: subject completion status ---------- */
+.status-box{margin-top:14px; padding-top:12px; border-top:1px dashed var(--rule);}
+.status-summary{font-family:var(--mono); font-size:11px; letter-spacing:.04em; color:var(--brass-deep); margin-bottom:8px;}
+.status-summary.all-done{color:var(--pass);}
+.status-list{display:flex; flex-direction:column; gap:4px; max-height:130px; overflow-y:auto; padding-right:4px;}
+.status-item{font-size:11.5px; color:var(--text-soft); display:flex; align-items:center; gap:6px; line-height:1.4;}
+.status-item .status-name{flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.status-count{font-family:var(--mono); font-size:10px; flex:0 0 auto;}
+.status-dot{width:8px; height:8px; border-radius:50%; flex:0 0 auto;}
+.status-dot.done{background:var(--pass);}
+.status-dot.pending{background:var(--fail);}
+
+/* ---------- Print / PDF export ---------- */
+.print-only{display:none;}
+.print-banner{text-align:center; margin-bottom:20px; padding-bottom:14px; border-bottom:2px solid var(--ink);}
+.print-banner h2{font-family:var(--serif); font-size:22px; margin:0 0 6px; color:var(--ink);}
+.print-banner .meta{font-family:var(--mono); font-size:11px; color:#444; margin-top:2px;}
+@media print{
+  @page{ size: A4 portrait; margin:14mm; }
+  body{background:#fff;}
+  .app{box-shadow:none; max-width:100%;}
+  .ribbon, footer.note, #screenRoot, .no-print{display:none !important;}
+  #printArea{display:block !important; padding:0 6px;}
+  #printArea table.report, #printArea table.ledger{font-size:11px;}
+  #printArea .section-block, #printArea .stat-cards{break-inside:avoid; page-break-inside:avoid;}
+  #printArea .stamp{border-width:1.5px;}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="ribbon">
+    <div class="brand">
+      <div class="seal" id="sealInit">SC</div>
+      <div>
+        <h1 id="schoolNameHeader">St. Xavier's Higher Secondary School</h1>
+        <div class="sub">HIGHER SECONDARY EXAMINATION &mdash; RESULT PORTAL</div>
+      </div>
+    </div>
+    <nav>
+      <button onclick="goHome()">Home</button>
+      <button onclick="goAnalysis()">Result Analysis</button>
+    </nav>
+  </div>
+  <div id="screenRoot"></div>
+  <div id="printArea" class="print-only"></div>
+  <footer class="note">Consolidated Marksheet System &middot; data stored in the school's Google Sheet &middot; enter marks as a number, or AA if the student was absent.</footer>
+</div>
+
+<script>
+/* =========================================================================
+   CONFIGURE THIS: paste your Apps Script Web App /exec URL below
+   ========================================================================= */
+const API_URL = "https://script.google.com/macros/s/AKfycbyKCkbWurh71uh6feX177X87tVw7yUY8tylsuVHibBvB5x9LIv35cKGSoudN-QgXeBr/exec";
+const SCHOOL_NAME = "Govt. Boys Higher Secondary School, Podaturpet-631208";
+
+/* ---------------- state ---------------- */
+let CONFIG = null;          // {groups:[...]}
+let CURRENT_GROUP = null;   // group code
+let CURRENT_MODE = null;    // 'CONSOLIDATED' | 'SUBJECT'
+let CURRENT_SUBJECT = null; // subject name (for SUBJECT mode, or active tab in CONSOLIDATED)
+let SESSION = null;         // login result
+
+document.getElementById('schoolNameHeader').textContent = SCHOOL_NAME;
+document.getElementById('sealInit').textContent = SCHOOL_NAME.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+
+const root = document.getElementById('screenRoot');
+
+/* ---------------- API helpers ---------------- */
+async function apiGet(action, params={}) {
+  const qs = new URLSearchParams({action, ...params}).toString();
+  const res = await fetch(`${API_URL}?${qs}`);
+  return res.json();
+}
+async function apiPost(action, payload={}) {
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'text/plain;charset=utf-8'}, // avoids CORS preflight on Apps Script
+    body: JSON.stringify({action, ...payload})
+  });
+  return res.json();
+}
+async function ensureConfig(){
+  if (!CONFIG) CONFIG = await apiGet('config');
+  return CONFIG;
+}
+
+/* ---------------- router ---------------- */
+function goHome(){ CURRENT_GROUP=null; CURRENT_MODE=null; CURRENT_SUBJECT=null; SESSION=null; renderHome(); }
+function goAnalysis(){ renderAnalysisPicker(); }
+
+/* ================= HOME ================= */
+async function renderHome(){
+  root.innerHTML = `<div class="screen"><div class="loading">Loading groups…</div></div>`;
+  const cfg = await ensureConfig();
+  const cards = cfg.groups.map(g => `
+    <div class="index-card" onclick="renderModePicker('${g.code}')">
+      <div class="code">${g.code}</div>
+      <h3>${g.name}</h3>
+      <div class="count">${g.subjects.length} subjects</div>
+      <div class="status-box" id="status-${g.code}"><span class="loading" style="padding:0;">Checking entry status&hellip;</span></div>
+      <div class="arrow">&rarr;</div>
+    </div>`).join('');
+  root.innerHTML = `
+    <div class="screen">
+      <div class="eyebrow">12th Standard &middot; Choose a Group</div>
+      <h2 class="title">${SCHOOL_NAME}</h2>
+      <p class="lede">Select a class group below to enter subject marks, or use <strong>Result Analysis</strong> in the top right to view the consolidated marksheet and statistics for a group.</p>
+      <div class="index-grid">${cards}</div>
+    </div>`;
+  cfg.groups.forEach(g => loadGroupStatus(g));
+}
+
+/* A mark record only counts as "entered" if every field that applies to this
+   subject actually has a value (a number, or AA for absent) — not merely
+   because the API returned a row for that student. This handles backends
+   that pre-populate one row per student with blank fields. */
+function isMarkFilled(m, s){
+  const has = v => v !== undefined && v !== null && String(v).trim() !== '';
+  if (s.hasTheory && !has(m.theory)) return false;
+  if (s.hasPractical && !has(m.practical)) return false;
+  if (!has(m.internal)) return false;
+  return true;
+}
+
+/* Fetches, per subject in a group, how many students have marks entered vs total
+   students, so the class teacher can see at a glance which subjects are still pending. */
+async function loadGroupStatus(g){
+  const box = document.getElementById(`status-${g.code}`);
+  if (!box) return;
+  try{
+    const studentsRes = await apiGet('students', {group: g.code});
+    const total = (studentsRes.students || []).length;
+    const marksResults = await Promise.all(
+      g.subjects.map(s => apiGet('marks', {group: g.code, subject: s.name}).catch(()=>({marks:[]})))
+    );
+    let doneCount = 0;
+    const rows = g.subjects.map((s, i) => {
+      const marksArr = marksResults[i].marks || [];
+      const entered = marksArr.filter(m => isMarkFilled(m, s)).length;
+      const complete = total > 0 && entered >= total;
+      if (complete) doneCount++;
+      return `<div class="status-item">
+        <span class="status-dot ${complete ? 'done' : 'pending'}"></span>
+        <span class="status-name">${s.name}</span>
+        <span class="status-count">${entered}/${total}</span>
+      </div>`;
+    }).join('');
+    const allDone = doneCount === g.subjects.length && g.subjects.length > 0;
+    box.innerHTML = `
+      <div class="status-summary ${allDone ? 'all-done' : ''}">${doneCount}/${g.subjects.length} subjects completed</div>
+      <div class="status-list">${rows}</div>`;
+  }catch(e){
+    box.innerHTML = `<div class="status-summary" style="color:var(--fail);">Entry status unavailable</div>`;
+  }
+}
+
+/* ================= MODE PICKER ================= */
+function renderModePicker(groupCode){
+  CURRENT_GROUP = groupCode;
+  const g = CONFIG.groups.find(x=>x.code===groupCode);
+  root.innerHTML = `
+    <div class="screen">
+      <div class="back-link" onclick="goHome()">&larr; Back to groups</div>
+      <div class="eyebrow">${g.code}</div>
+      <h2 class="title">${g.name}</h2>
+      <p class="lede">Choose how you'd like to enter marks for this group.</p>
+      <div class="choice-row">
+        <div class="choice-card" onclick="startLogin('CONSOLIDATED')">
+          <div class="tag">Class Teacher Mode</div>
+          <h3>Consolidated Entry</h3>
+          <p>Enter marks for all ${g.subjects.length} subjects of this group in one session — for the class teacher who manages the whole marksheet.</p>
+        </div>
+        <div class="choice-card" onclick="renderSubjectPicker()">
+          <div class="tag">Subject Teacher Mode</div>
+          <h3>Single Subject Entry</h3>
+          <p>Enter marks for just one subject you teach in this group.</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSubjectPicker(){
+  const g = CONFIG.groups.find(x=>x.code===CURRENT_GROUP);
+  const chips = g.subjects.map(s => `
+    <div class="subject-chip" onclick="selectSubjectAndLogin('${s.name.replace(/'/g,"\\'")}')">
+      ${s.name}
+      <small>${s.hasTheory? 'Theory '+s.theoryMax+' + ':''}${s.hasPractical? 'Practical '+s.practicalMax+' + ':''}Internal ${s.internalMax}</small>
+    </div>`).join('');
+  root.innerHTML = `
+    <div class="screen">
+      <div class="back-link" onclick="renderModePicker('${CURRENT_GROUP}')">&larr; Back</div>
+      <div class="eyebrow">${g.code} &middot; Single Subject</div>
+      <h2 class="title">Which subject?</h2>
+      <p class="lede">Select the subject you'd like to enter marks for.</p>
+      <div class="subject-grid">${chips}</div>
+    </div>`;
+}
+function selectSubjectAndLogin(subjectName){
+  CURRENT_SUBJECT = subjectName;
+  startLogin('SUBJECT');
+}
+
+/* ================= LOGIN ================= */
+function startLogin(mode){
+  CURRENT_MODE = mode;
+  root.innerHTML = `
+    <div class="screen">
+      <div class="back-link" onclick="${mode==='SUBJECT' ? "renderSubjectPicker()" : `renderModePicker('${CURRENT_GROUP}')`}">&larr; Back</div>
+      <div class="login-box">
+        <div class="crest"><div class="seal2">&#9998;</div></div>
+        <h2 class="title" style="text-align:center;font-size:22px;">Teacher Login</h2>
+        <p class="lede" style="text-align:center;margin:0 0 10px;">
+          ${mode==='CONSOLIDATED' ? `Class Teacher &mdash; ${CURRENT_GROUP}` : `${CURRENT_SUBJECT} &mdash; ${CURRENT_GROUP}`}
+        </p>
+        <label>Username</label>
+        <input type="text" id="loginUser" autocomplete="username">
+        <label>Password</label>
+        <input type="password" id="loginPass" autocomplete="current-password">
+        <div class="btn-row">
+          <button class="btn" onclick="doLogin()">Sign in</button>
+        </div>
+        <div class="error-msg" id="loginErr"></div>
+      </div>
+    </div>`;
+}
+
+async function doLogin(){
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginErr');
+  errEl.textContent = 'Checking…';
+  try{
+    const res = await apiPost('login', {username, password});
+    if (!res.success){ errEl.textContent = res.message || 'Invalid credentials.'; return; }
+    // permission check
+    const okGroup = res.groupCode === 'ALL' || res.groupCode === CURRENT_GROUP;
+    const okSubject = res.role === 'ADMIN' || res.subjectName === 'ALL' || res.subjectName === CURRENT_SUBJECT;
+    if (!okGroup || (CURRENT_MODE==='SUBJECT' && !okSubject)){
+      errEl.textContent = "You don't have access to enter marks for this group/subject.";
+      return;
+    }
+    SESSION = res;
+    if (CURRENT_MODE === 'CONSOLIDATED') renderConsolidatedSubjectTabs();
+    else renderMarksEntry(CURRENT_SUBJECT);
+  }catch(e){ errEl.textContent = 'Could not reach the server. Check API_URL / network.'; }
+}
+
+/* ================= CONSOLIDATED: subject tabs ================= */
+function renderConsolidatedSubjectTabs(){
+  const g = CONFIG.groups.find(x=>x.code===CURRENT_GROUP);
+  const tabs = g.subjects.map(s=>`<button onclick="renderMarksEntry('${s.name.replace(/'/g,"\\'")}')">${s.name}</button>`).join('');
+  root.innerHTML = `
+    <div class="screen">
+      <div class="eyebrow">${g.code} &middot; Consolidated Entry &middot; ${SESSION.teacherName}</div>
+      <h2 class="title">Pick a subject to enter</h2>
+      <p class="lede">As class teacher you can enter marks for every subject below, one at a time.</p>
+      <div class="group-select-row">${tabs}</div>
+    </div>`;
+}
+
+/* ================= MARKS ENTRY ================= */
+async function renderMarksEntry(subjectName){
+  CURRENT_SUBJECT = subjectName;
+  const g = CONFIG.groups.find(x=>x.code===CURRENT_GROUP);
+  const s = g.subjects.find(x=>x.name===subjectName);
+  root.innerHTML = `<div class="screen"><div class="loading">Loading student list…</div></div>`;
+
+  const [studentsRes, marksRes] = await Promise.all([
+    apiGet('students', {group: CURRENT_GROUP}),
+    apiGet('marks', {group: CURRENT_GROUP, subject: subjectName})
+  ]);
+  const students = studentsRes.students || [];
+  const existing = {};
+  (marksRes.marks || []).forEach(m => existing[m.regno] = m);
+
+  const backAction = CURRENT_MODE==='CONSOLIDATED' ? 'renderConsolidatedSubjectTabs()' : `renderSubjectPicker()`;
+
+  const rows = students.map(st => {
+    const ex = existing[st.regno] || {};
+    const r = computeRowResult(ex.theory, ex.practical, ex.internal, s);
+    return `
+      <tr data-regno="${st.regno}">
+        <td class="reg-cell">${st.regno}</td>
+        <td class="name-cell">${st.name}</td>
+        ${s.hasTheory ? `<td><input type="text" class="m-theory" value="${ex.theory ?? ''}" placeholder="/${s.theoryMax}" oninput="recalcRow(this)"></td>` : ''}
+        ${s.hasPractical ? `<td><input type="text" class="m-practical" value="${ex.practical ?? ''}" placeholder="/${s.practicalMax}" oninput="recalcRow(this)"></td>` : ''}
+        <td><input type="text" class="m-internal" value="${ex.internal ?? ''}" placeholder="/${s.internalMax}" oninput="recalcRow(this)"></td>
+        <td class="cell-total">${r.totalDisplay}</td>
+        <td><span class="result-tag ${r.status}">${r.resultLabel}</span></td>
+      </tr>`;
+  }).join('');
+
+  root.innerHTML = `
+    <div class="screen">
+      <div class="back-link" onclick="${backAction}">&larr; Back</div>
+      <div class="eyebrow">${g.code} &middot; ${SESSION.teacherName}</div>
+      <h2 class="title">${subjectName} &mdash; Marks Entry</h2>
+      <div class="ledger-meta">
+        <div><span class="k">Theory Pass Mark</span>${s.hasTheory ? s.theoryPass : (s.hasPractical ? '&mdash;' : '&mdash;')}</div>
+        <div><span class="k">Practical Pass Mark</span>${(!s.hasTheory && s.hasPractical) ? s.practicalPass : '&mdash;'}</div>
+        <div><span class="k">Students</span>${students.length}</div>
+      </div>
+      <div class="autofill-bar">
+        <label style="margin:0; display:flex; align-items:center; gap:8px; text-transform:none; font-family:inherit; font-size:13px; letter-spacing:0;">
+          <input type="checkbox" id="autofillChk" style="width:auto;" onchange="applyAutofill()">
+          Auto-fill full marks (Practical/Internal) for all students &mdash; you can still overwrite individual cells or mark AA for absentees.
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead>
+            <tr>
+              <th>Reg. No.</th><th>Student Name</th>
+              ${s.hasTheory ? `<th>Theory (${s.theoryMax})</th>` : ''}
+              ${s.hasPractical ? `<th>Practical (${s.practicalMax})</th>` : ''}
+              <th>Internal (${s.internalMax})</th>
+              <th>Total</th><th>Result</th>
+            </tr>
+          </thead>
+          <tbody id="marksBody">${rows}</tbody>
+        </table>
+      </div>
+      <div class="submit-bar">
+        <button class="btn" onclick="submitMarksNow()">Submit Marks</button>
+        <button class="btn secondary" onclick="downloadSubjectMarksheet()">Download Marksheet (PDF)</button>
+        <span class="status-msg" id="submitStatus"></span>
+      </div>
+    </div>`;
+
+  window._currentSubjectDef = s;
+}
+
+/* Builds a full result-analysis report for the subject currently on screen
+   (stat cards, ranked marksheet, subject stats, mark-distribution bands) —
+   mirroring the consolidated Result Analysis report — and sends it to
+   print, so the teacher can "Save as PDF" from the browser's print dialog. */
+function downloadSubjectMarksheet(){
+  const s = window._currentSubjectDef;
+  const g = CONFIG.groups.find(x=>x.code===CURRENT_GROUP);
+  const trs = document.querySelectorAll('#marksBody tr');
+
+  const rowsData = Array.from(trs).map(tr=>{
+    const regno = tr.getAttribute('data-regno');
+    const name = tr.querySelector('.name-cell').textContent;
+    const theoryEl = tr.querySelector('.m-theory');
+    const practicalEl = tr.querySelector('.m-practical');
+    const internalEl = tr.querySelector('.m-internal');
+    const theory = theoryEl ? theoryEl.value : '';
+    const practical = practicalEl ? practicalEl.value : '';
+    const internal = internalEl ? internalEl.value : '';
+    const r = computeRowResult(theory, practical, internal, s);
+    return {regno, name, theory, practical, internal, ...r};
+  });
+
+  const totalStudents = rowsData.length;
+  const absentList = rowsData.filter(r=>r.status==='ABSENT');
+  const pendingList = rowsData.filter(r=>r.status==='PENDING');
+  const scoredList = rowsData.filter(r=>r.numericTotal !== null);
+  const appeared = scoredList.length;
+  const passed = scoredList.filter(r=>r.status==='PASS').length;
+  const failed = scoredList.filter(r=>r.status==='FAIL').length;
+  const passPct = appeared > 0 ? ((passed/appeared)*100).toFixed(2) : '0.00';
+
+  const totalsOnly = scoredList.map(r=>r.numericTotal);
+  const highest = totalsOnly.length ? Math.max(...totalsOnly) : '&mdash;';
+  const lowest = totalsOnly.length ? Math.min(...totalsOnly) : '&mdash;';
+  const average = totalsOnly.length ? (totalsOnly.reduce((a,b)=>a+b,0)/totalsOnly.length).toFixed(2) : '&mdash;';
+  const subjectMax = (s.hasTheory?Number(s.theoryMax):0) + (s.hasPractical?Number(s.practicalMax):0) + Number(s.internalMax);
+
+  // Rank appeared students by total marks (standard ranking — ties share a rank).
+  const ranked = scoredList.slice().sort((a,b)=> b.numericTotal - a.numericTotal);
+  let rank = 0, prevTotal = null, seen = 0;
+  const rankMap = {};
+  ranked.forEach(r=>{
+    seen++;
+    if (r.numericTotal !== prevTotal){ rank = seen; prevTotal = r.numericTotal; }
+    rankMap[r.regno] = rank;
+  });
+
+  const bandCounts = {}; BAND_LABELS.forEach(b=>bandCounts[b]=0);
+  scoredList.forEach(r=>{ bandCounts[bandForScore(r.numericTotal)]++; });
+
+  const marksheetRows = rowsData
+    .slice()
+    .sort((a,b)=> (rankMap[a.regno] ?? 99999) - (rankMap[b.regno] ?? 99999))
+    .map(r => `
+      <tr>
+        <td class="left">${rankMap[r.regno] ?? '&mdash;'}</td>
+        <td class="reg-cell left">${r.regno}</td>
+        <td class="left">${r.name}</td>
+        ${s.hasTheory ? `<td>${r.theory || '&mdash;'}</td>` : ''}
+        ${s.hasPractical ? `<td>${r.practical || '&mdash;'}</td>` : ''}
+        <td>${r.internal || '&mdash;'}</td>
+        <td><strong>${r.totalDisplay}</strong></td>
+        <td><span class="stamp ${r.status}">${r.resultLabel}</span></td>
+      </tr>`).join('');
+
+  const overallCards = `
+    <div class="stat-cards">
+      <div class="stat-card"><div class="num">${totalStudents}</div><div class="lbl">Total Students</div></div>
+      <div class="stat-card"><div class="num">${absentList.length}</div><div class="lbl">Absent</div></div>
+      <div class="stat-card"><div class="num">${appeared}</div><div class="lbl">Appeared</div></div>
+      <div class="stat-card"><div class="num">${passed}</div><div class="lbl">Passed</div></div>
+      <div class="stat-card"><div class="num">${failed}</div><div class="lbl">Failed</div></div>
+      <div class="stat-card"><div class="num">${passPct}%</div><div class="lbl">Pass Percentage</div></div>
+    </div>`;
+
+  const pendingNote = pendingList.length
+    ? `<p style="font-family:var(--mono); font-size:11px; color:var(--fail); margin-top:6px;">${pendingList.length} student(s) still have incomplete entries and are excluded from the statistics below.</p>`
+    : '';
+
+  document.getElementById('printArea').innerHTML = `
+    <div class="print-banner">
+      <h2>${SCHOOL_NAME}</h2>
+      <div class="meta">${g.code} &middot; ${g.name} &mdash; ${CURRENT_SUBJECT} Result Analysis</div>
+      <div class="meta">Entered by: ${SESSION.teacherName} &middot; Printed: ${new Date().toLocaleString()}</div>
+    </div>
+
+    ${overallCards}
+    ${pendingNote}
+
+    <div class="section-block">
+      <h3>${CURRENT_SUBJECT} &mdash; Marksheet</h3>
+      <p class="note">Result per student for this subject. Absent students are excluded from pass/fail and rank. Rank is by total marks among students who appeared.</p>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr>
+            <th>Rank</th><th>Reg. No.</th><th class="left">Name</th>
+            ${s.hasTheory ? `<th>Theory (${s.theoryMax})</th>` : ''}
+            ${s.hasPractical ? `<th>Practical (${s.practicalMax})</th>` : ''}
+            <th>Internal (${s.internalMax})</th><th>Total (${subjectMax})</th><th>Result</th>
+          </tr></thead>
+          <tbody>${marksheetRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h3>Subject Statistics</h3>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr><th class="left">Subject</th><th>Total</th><th>Absent</th><th>Appeared</th><th>Passed</th><th>Failed</th><th>Pass %</th><th>Max Marks</th><th>Highest</th><th>Lowest</th><th>Average</th></tr></thead>
+          <tbody><tr>
+            <td class="left">${CURRENT_SUBJECT}</td>
+            <td>${totalStudents}</td><td>${absentList.length}</td><td>${appeared}</td>
+            <td>${passed}</td><td>${failed}</td><td>${passPct}%</td>
+            <td>${subjectMax}</td><td>${highest}</td><td>${lowest}</td><td>${average}</td>
+          </tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h3>Mark Distribution</h3>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr>${BAND_LABELS.map(b=>`<th>${b}</th>`).join('')}</tr></thead>
+          <tbody><tr>${BAND_LABELS.map(b=>`<td>${bandCounts[b]}</td>`).join('')}</tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p style="font-family:var(--mono); font-size:10.5px; color:#555; margin-top:16px;">
+      Note: this analysis is generated from marks as currently entered on screen. The official consolidated result is finalised in Result Analysis once all subjects for the group are submitted.
+    </p>`;
+  window.print();
+}
+
+/* ---------------- shared mark calculation ---------------- */
+const BAND_LABELS = ['=100','>=80 And <100','>=70 And <80','>=60 And <70','>=50 And <60','>=40 And <50','>=35 And <40','<35'];
+function bandForScore(score){
+  if (score === 100) return '=100';
+  if (score >= 80) return '>=80 And <100';
+  if (score >= 70) return '>=70 And <80';
+  if (score >= 60) return '>=60 And <70';
+  if (score >= 50) return '>=50 And <60';
+  if (score >= 40) return '>=40 And <50';
+  if (score >= 35) return '>=35 And <40';
+  return '<35';
+}
+
+/* Given the raw theory/practical/internal cell values for one student, works
+   out their total and PASS/FAIL/ABSENT/PENDING status for this subject.
+   PENDING = not all applicable fields have been filled in yet. */
+function computeRowResult(theoryVal, practicalVal, internalVal, s){
+  const norm = v => (v===undefined || v===null) ? '' : String(v).trim();
+  const theory = s.hasTheory ? norm(theoryVal) : null;
+  const practical = s.hasPractical ? norm(practicalVal) : null;
+  const internal = norm(internalVal);
+  const isAA = v => v !== null && v !== '' && v.toUpperCase() === 'AA';
+
+  if ((s.hasTheory && isAA(theory)) || (s.hasPractical && isAA(practical)) || isAA(internal)){
+    return {status:'ABSENT', totalDisplay:'AA', resultLabel:'ABSENT', numericTotal:null};
+  }
+  const missing = (s.hasTheory && theory==='') || (s.hasPractical && practical==='') || internal==='';
+  if (missing){
+    return {status:'PENDING', totalDisplay:'&mdash;', resultLabel:'PENDING', numericTotal:null};
+  }
+  const tN = s.hasTheory ? parseFloat(theory) : 0;
+  const pN = s.hasPractical ? parseFloat(practical) : 0;
+  const iN = parseFloat(internal);
+  if ((s.hasTheory && isNaN(tN)) || (s.hasPractical && isNaN(pN)) || isNaN(iN)){
+    return {status:'PENDING', totalDisplay:'&mdash;', resultLabel:'PENDING', numericTotal:null};
+  }
+  const total = (s.hasTheory?tN:0) + (s.hasPractical?pN:0) + iN;
+  const failTheory = s.hasTheory && tN < Number(s.theoryPass);
+  const failPractical = s.hasPractical && pN < Number(s.practicalPass);
+  const pass = !failTheory && !failPractical;
+  return {status: pass?'PASS':'FAIL', totalDisplay:String(total), resultLabel: pass?'PASS':'FAIL', numericTotal: total};
+}
+
+function recalcRowFromTr(tr){
+  const s = window._currentSubjectDef;
+  const theoryEl = tr.querySelector('.m-theory');
+  const practicalEl = tr.querySelector('.m-practical');
+  const internalEl = tr.querySelector('.m-internal');
+  const r = computeRowResult(
+    theoryEl ? theoryEl.value : null,
+    practicalEl ? practicalEl.value : null,
+    internalEl ? internalEl.value : null,
+    s
+  );
+  tr.querySelector('.cell-total').innerHTML = r.totalDisplay;
+  const resultEl = tr.querySelector('.result-tag');
+  resultEl.textContent = r.resultLabel;
+  resultEl.className = 'result-tag ' + r.status;
+}
+function recalcRow(inputEl){ recalcRowFromTr(inputEl.closest('tr')); }
+
+function applyAutofill(){
+  const chk = document.getElementById('autofillChk');
+  const s = window._currentSubjectDef;
+  if (!chk.checked) return;
+  document.querySelectorAll('#marksBody tr').forEach(tr=>{
+    if (s.hasPractical){
+      const p = tr.querySelector('.m-practical');
+      if (p && !p.value) p.value = s.practicalMax;
+    }
+    const i = tr.querySelector('.m-internal');
+    if (i && !i.value) i.value = s.internalMax;
+    recalcRowFromTr(tr);
+  });
+}
+
+async function submitMarksNow(){
+  const s = window._currentSubjectDef;
+  const statusEl = document.getElementById('submitStatus');
+  const rows = document.querySelectorAll('#marksBody tr');
+  const marks = [];
+  rows.forEach(tr=>{
+    const regno = tr.getAttribute('data-regno');
+    const rec = {regno};
+    if (s.hasTheory) rec.theory = (tr.querySelector('.m-theory').value || '').trim();
+    if (s.hasPractical) rec.practical = (tr.querySelector('.m-practical').value || '').trim();
+    rec.internal = (tr.querySelector('.m-internal').value || '').trim();
+    marks.push(rec);
+  });
+  statusEl.textContent = 'Submitting…';
+  statusEl.className = 'status-msg';
+  try{
+    const res = await apiPost('submitMarks', {group: CURRENT_GROUP, subject: CURRENT_SUBJECT, marks});
+    if (res.success){
+      statusEl.textContent = `Saved marks for ${res.updated} students.`;
+      statusEl.className = 'status-msg ok';
+    } else {
+      statusEl.textContent = res.message || 'Something went wrong.';
+      statusEl.className = 'status-msg err';
+    }
+  }catch(e){
+    statusEl.textContent = 'Could not reach the server.';
+    statusEl.className = 'status-msg err';
+  }
+}
+
+/* ================= ANALYSIS ================= */
+async function renderAnalysisPicker(){
+  root.innerHTML = `<div class="screen"><div class="loading">Loading groups…</div></div>`;
+  const cfg = await ensureConfig();
+  const btns = cfg.groups.map(g=>`<button onclick="renderAnalysis('${g.code}')">${g.code}</button>`).join('');
+  root.innerHTML = `
+    <div class="screen">
+      <div class="eyebrow">Result Analysis</div>
+      <h2 class="title">Choose a group to view its results</h2>
+      <div class="group-select-row">${btns}</div>
+      <div id="analysisRoot"></div>
+    </div>`;
+}
+
+async function renderAnalysis(groupCode){
+  document.querySelectorAll('.group-select-row button').forEach(b=>b.classList.toggle('active', b.textContent===groupCode));
+  const target = document.getElementById('analysisRoot');
+  target.innerHTML = `<div class="loading">Crunching the numbers…</div>`;
+  const a = await apiGet('analysis', {group: groupCode});
+  if (a.error){ target.innerHTML = `<div class="loading">${a.error}</div>`; return; }
+
+  const o = a.overall;
+  const overallCards = `
+    <div class="stat-cards">
+      <div class="stat-card"><div class="num">${o.totalStudents}</div><div class="lbl">Total Students</div></div>
+      <div class="stat-card"><div class="num">${o.absent}</div><div class="lbl">Absent</div></div>
+      <div class="stat-card"><div class="num">${o.appeared}</div><div class="lbl">Appeared</div></div>
+      <div class="stat-card"><div class="num">${o.passed}</div><div class="lbl">Passed (All Subjects)</div></div>
+      <div class="stat-card"><div class="num">${o.failed}</div><div class="lbl">Failed</div></div>
+      <div class="stat-card"><div class="num">${o.passPercentage}%</div><div class="lbl">Pass Percentage</div></div>
+    </div>`;
+
+  const marksheetRows = a.marksheet
+    .slice()
+    .sort((x,y)=> (x.rank===''?9999:x.rank) - (y.rank===''?9999:y.rank))
+    .map(st => `
+      <tr>
+        <td class="left">${st.rank || '&mdash;'}</td>
+        <td class="reg-cell left">${st.regno}</td>
+        <td class="left">${st.name}</td>
+        ${st.subjects.map(sub => `<td>${sub.pass==='ABSENT' ? 'AA' : (sub.total ?? '&mdash;')}</td>`).join('')}
+        <td><strong>${st.total ?? '&mdash;'}</strong></td>
+        <td><span class="stamp ${st.status}">${st.status}</span></td>
+      </tr>`).join('');
+
+  const subjectHeaders = a.subjects.map(s=>`<th>${s}</th>`).join('');
+
+  const bandLabels = ['=100','>=80 And <100','>=70 And <80','>=60 And <70','>=50 And <60','>=40 And <50','>=35 And <40','<35'];
+  const subjectStatsRows = a.subjectStats.map(s => `
+    <tr>
+      <td class="left">${s.subject}</td>
+      <td>${s.totalStudents}</td><td>${s.absent}</td><td>${s.appeared}</td>
+      <td>${s.passed}</td><td>${s.failed}</td><td>${s.passPercentage}%</td>
+      <td>${s.totalMarks}</td><td>${s.highest}</td><td>${s.lowest}</td><td>${s.average}</td>
+    </tr>`).join('');
+
+  const bandRows = a.subjectStats.map(s => `
+    <tr>
+      <td class="left">${s.subject}</td>
+      ${bandLabels.map(b=>`<td>${s.bands[b]}</td>`).join('')}
+    </tr>`).join('');
+
+  const failDistKeys = Object.keys(a.failDistribution);
+  const failDistRow = failDistKeys.map(k=>`<td>${a.failDistribution[k]}</td>`).join('');
+
+  const subjFailRows = a.subjectFailures.map(s=>`
+    <tr><td class="left">${s.subject}</td><td>${s.failed}</td></tr>`).join('');
+
+  target.innerHTML = `
+    <div class="submit-bar no-print" style="margin:0 0 20px;">
+      <button class="btn" onclick="downloadConsolidatedPDF('${groupCode}')">Download Full Report (PDF)</button>
+    </div>
+
+    ${overallCards}
+
+    <div class="section-block">
+      <h3>Consolidated Marksheet</h3>
+      <p class="note">Result and rank per student. Absent students are excluded from pass/fail and rank. Rank is by total marks among students who appeared.</p>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr><th>Rank</th><th>Reg. No.</th><th class="left">Name</th>${subjectHeaders}<th>Total (600)</th><th>Result</th></tr></thead>
+          <tbody>${marksheetRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h3>Subject-wise Statistics</h3>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr><th class="left">Subject</th><th>Total</th><th>Absent</th><th>Appeared</th><th>Passed</th><th>Failed</th><th>Pass %</th><th>Total Marks</th><th>Highest</th><th>Lowest</th><th>Average</th></tr></thead>
+          <tbody>${subjectStatsRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h3>Subject-wise Mark Distribution</h3>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr><th class="left">Subject</th>${bandLabels.map(b=>`<th>${b}</th>`).join('')}</tr></thead>
+          <tbody>${bandRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h3>Number of Students Failed in N Subjects</h3>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr>${failDistKeys.map(k=>`<th>${k} Subject${k>1?'s':''}</th>`).join('')}</tr></thead>
+          <tbody><tr>${failDistRow}</tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h3>Subject-wise Number of Failures</h3>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr><th class="left">Subject</th><th>No. Failed</th></tr></thead>
+          <tbody>${subjFailRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+/* Clones the already-rendered consolidated analysis (marksheet + all stat
+   tables) into the print-only area with a proper header, and prints it —
+   this is what the class teacher uses to save the full consolidated result
+   as a PDF. */
+function downloadConsolidatedPDF(groupCode){
+  const g = CONFIG.groups.find(x=>x.code===groupCode);
+  const analysisContent = document.getElementById('analysisRoot').innerHTML;
+  document.getElementById('printArea').innerHTML = `
+    <div class="print-banner">
+      <h2>${SCHOOL_NAME}</h2>
+      <div class="meta">${g.code} &middot; ${g.name} &mdash; Consolidated Result Report</div>
+      <div class="meta">Printed: ${new Date().toLocaleString()}</div>
+    </div>
+    ${analysisContent}`;
+  window.print();
+}
+
+/* ---------------- boot ---------------- */
+renderHome();
+</script>
+</body>
+</html>
