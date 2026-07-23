@@ -219,6 +219,14 @@ table.report td.left{text-align:left;}
 }
 .group-select-row button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
 .picker-label{font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--brass-deep); margin:0 0 8px;}
+.class-badge{
+  font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+  background:var(--ink); color:var(--paper); padding:2px 8px; border-radius:2px; margin-left:8px;
+}
+.medium-tag{
+  display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--brass-deep); border:1px solid var(--rule); padding:2px 8px; border-radius:2px; margin-top:6px;
+}
 
 .exam-picker{margin-bottom:28px; padding:16px 18px; background:var(--paper-2); border:1px solid var(--rule);}
 .exam-picker .k{font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--brass-deep); margin-bottom:10px;}
@@ -270,12 +278,13 @@ footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-
       <div class="seal" id="sealInit">SC</div>
       <div>
         <h1 id="schoolNameHeader">St. Xavier's Higher Secondary School</h1>
-        <div class="sub">HIGHER SECONDARY EXAMINATION &mdash; RESULT PORTAL</div>
+        <div class="sub">HIGHER SECONDARY EXAMINATION &mdash; RESULT PORTAL <span class="class-badge" id="classBadge" style="display:none;"></span></div>
       </div>
     </div>
     <nav>
       <button onclick="goHome()">Home</button>
       <button onclick="goAnalysis()">Result Analysis</button>
+      <button onclick="goClassSelect()">Change Class</button>
     </nav>
   </div>
   <div id="screenRoot"></div>
@@ -285,9 +294,24 @@ footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-
 
 <script>
 /* =========================================================================
-   CONFIGURE THIS: paste your Apps Script Web App /exec URL below
+   CONFIGURE THIS: paste each class's Apps Script Web App /exec URL below.
+   12th Standard and 10th Standard are backed by two SEPARATE Google Sheets,
+   so they each need their own deployed Apps Script Web App URL.
    ========================================================================= */
-const API_URL = "https://script.google.com/macros/s/AKfycbyKCkbWurh71uh6feX177X87tVw7yUY8tylsuVHibBvB5x9LIv35cKGSoudN-QgXeBr/exec";
+const CLASSES = {
+  '12': {
+    label: '12th Standard',
+    sub: 'Higher Secondary Examination',
+    groupWord: 'Group',
+    apiUrl: "https://script.google.com/macros/s/AKfycbyKCkbWurh71uh6feX177X87tVw7yUY8tylsuVHibBvB5x9LIv35cKGSoudN-QgXeBr/exec"
+  },
+  '10': {
+    label: '10th Standard',
+    sub: 'Secondary Education (SSLC)',
+    groupWord: 'Section',
+    apiUrl: "https://script.google.com/macros/s/AKfycbz1ek-Lkh0me4vxreNy1G36JItsp94KLnspp3FhQvcvI4gDendelSM3XCzgzfeTWAxYxg/exec"
+  }
+};
 const SCHOOL_NAME = "Govt. Boys Higher Secondary School, Podaturpet-631208";
 
 /* ---------------- examination types ---------------- */
@@ -304,9 +328,16 @@ function examLabel(code){
   return e ? `${e.name} \u2014 ${e.period}` : (code || 'Examination not selected');
 }
 
+/* A subject only has an "Internal" column if its config actually defines a
+   positive internalMax. This lets 10th Standard subjects (which have no
+   internal-marks component) skip that field entirely. */
+function subjectHasInternal(s){ return !!(s.internalMax && Number(s.internalMax) > 0); }
+
 /* ---------------- state ---------------- */
-let CONFIG = null;          // {groups:[...]}
-let CURRENT_GROUP = null;   // group code
+let CURRENT_CLASS = null;   // '12' | '10' — which standard/sheet is active
+let CONFIGS = {};           // per-class config cache: {'12': {groups:[...]}, '10': {...}}
+let CONFIG = null;          // convenience pointer to CONFIGS[CURRENT_CLASS]
+let CURRENT_GROUP = null;   // group/section code
 let CURRENT_MODE = null;    // 'CONSOLIDATED' | 'SUBJECT'
 let CURRENT_SUBJECT = null; // subject name (for SUBJECT mode, or active tab in CONSOLIDATED)
 let CURRENT_EXAM = EXAMS[0].code; // examination currently selected for entry
@@ -318,13 +349,14 @@ document.getElementById('sealInit').textContent = SCHOOL_NAME.split(' ').map(w=>
 const root = document.getElementById('screenRoot');
 
 /* ---------------- API helpers ---------------- */
+function currentApiUrl(){ return CLASSES[CURRENT_CLASS].apiUrl; }
 async function apiGet(action, params={}) {
   const qs = new URLSearchParams({action, ...params}).toString();
-  const res = await fetch(`${API_URL}?${qs}`);
+  const res = await fetch(`${currentApiUrl()}?${qs}`);
   return res.json();
 }
 async function apiPost(action, payload={}) {
-  const res = await fetch(API_URL, {
+  const res = await fetch(currentApiUrl(), {
     method: 'POST',
     headers: {'Content-Type':'text/plain;charset=utf-8'}, // avoids CORS preflight on Apps Script
     body: JSON.stringify({action, ...payload})
@@ -332,33 +364,75 @@ async function apiPost(action, payload={}) {
   return res.json();
 }
 async function ensureConfig(){
-  if (!CONFIG) CONFIG = await apiGet('config');
+  if (!CONFIGS[CURRENT_CLASS]) CONFIGS[CURRENT_CLASS] = await apiGet('config');
+  CONFIG = CONFIGS[CURRENT_CLASS];
   return CONFIG;
 }
 
 /* ---------------- router ---------------- */
-function goHome(){ CURRENT_GROUP=null; CURRENT_MODE=null; CURRENT_SUBJECT=null; SESSION=null; renderHome(); }
-function goAnalysis(){ renderAnalysisPicker(); }
+function goClassSelect(){
+  CURRENT_CLASS=null; CURRENT_GROUP=null; CURRENT_MODE=null; CURRENT_SUBJECT=null; SESSION=null;
+  renderClassSelect();
+}
+function selectClass(code){
+  CURRENT_CLASS = code;
+  document.getElementById('classBadge').textContent = CLASSES[code].label;
+  document.getElementById('classBadge').style.display = 'inline-block';
+  goHome();
+}
+function goHome(){
+  if (!CURRENT_CLASS){ renderClassSelect(); return; }
+  CURRENT_GROUP=null; CURRENT_MODE=null; CURRENT_SUBJECT=null; SESSION=null; renderHome();
+}
+function goAnalysis(){
+  if (!CURRENT_CLASS){ renderClassSelect(); return; }
+  renderAnalysisPicker();
+}
+
+/* ================= CLASS SELECT (landing page) ================= */
+function renderClassSelect(){
+  document.getElementById('classBadge').style.display = 'none';
+  root.innerHTML = `
+    <div class="screen">
+      <div class="eyebrow">${SCHOOL_NAME}</div>
+      <h2 class="title">Which class are you working with?</h2>
+      <p class="lede">Each standard keeps its own students, subjects, and result records.</p>
+      <div class="choice-row">
+        <div class="choice-card" onclick="selectClass('12')">
+          <div class="tag">Higher Secondary</div>
+          <h3>12th Standard</h3>
+          <p>Group-wise subject combinations, marks entry, and consolidated result analysis.</p>
+        </div>
+        <div class="choice-card" onclick="selectClass('10')">
+          <div class="tag">Secondary (SSLC)</div>
+          <h3>10th Standard</h3>
+          <p>Sections 10-A to 10-E &mdash; Tamil, English, Mathematics, Science and Social Science.</p>
+        </div>
+      </div>
+    </div>`;
+}
 
 /* ================= HOME ================= */
 async function renderHome(){
   root.innerHTML = `<div class="screen"><div class="loading">Loading groups…</div></div>`;
   const cfg = await ensureConfig();
+  const cls = CLASSES[CURRENT_CLASS];
   const examPills = EXAMS.map(e => `
     <button class="${e.code===CURRENT_EXAM?'active':''}" data-exam="${e.code}" onclick="selectHomeExam('${e.code}')">${e.name}<br><small style="font-weight:400;">${e.period}</small></button>`).join('');
   const cards = cfg.groups.map(g => `
     <div class="index-card" onclick="renderModePicker('${g.code}')">
       <div class="code">${g.code}</div>
       <h3>${g.name}</h3>
+      ${g.medium ? `<div class="medium-tag">${g.medium} Medium</div>` : ''}
       <div class="count">${g.subjects.length} subjects</div>
       <div class="status-box" id="status-${g.code}"><span class="loading" style="padding:0;">Checking entry status&hellip;</span></div>
       <div class="arrow">&rarr;</div>
     </div>`).join('');
   root.innerHTML = `
     <div class="screen">
-      <div class="eyebrow">12th Standard &middot; Choose a Group</div>
+      <div class="eyebrow">${cls.label} &middot; Choose a ${cls.groupWord}</div>
       <h2 class="title">${SCHOOL_NAME}</h2>
-      <p class="lede">Select a class group below to enter subject marks, or use <strong>Result Analysis</strong> in the top right to view the consolidated marksheet and statistics for a group.</p>
+      <p class="lede">Select a ${cls.groupWord.toLowerCase()} below to enter subject marks, or use <strong>Result Analysis</strong> in the top right to view the consolidated marksheet and statistics for a ${cls.groupWord.toLowerCase()}.</p>
       <div class="exam-picker">
         <div class="k">Examination &mdash; marks will be entered for</div>
         <div class="exam-pill-row" id="examPillRow">${examPills}</div>
@@ -425,22 +499,24 @@ async function loadGroupStatus(g){
 function renderModePicker(groupCode){
   CURRENT_GROUP = groupCode;
   const g = CONFIG.groups.find(x=>x.code===groupCode);
+  const cls = CLASSES[CURRENT_CLASS];
   root.innerHTML = `
     <div class="screen">
-      <div class="back-link" onclick="goHome()">&larr; Back to groups</div>
+      <div class="back-link" onclick="goHome()">&larr; Back to ${cls.groupWord.toLowerCase()}s</div>
       <div class="eyebrow">${g.code} &middot; ${examLabel(CURRENT_EXAM)} <span class="back-link" style="margin:0 0 0 10px; display:inline;" onclick="goHome()">(change exam)</span></div>
       <h2 class="title">${g.name}</h2>
-      <p class="lede">Choose how you'd like to enter marks for this group.</p>
+      ${g.medium ? `<div class="medium-tag">${g.medium} Medium</div>` : ''}
+      <p class="lede">Choose how you'd like to enter marks for this ${cls.groupWord.toLowerCase()}.</p>
       <div class="choice-row">
         <div class="choice-card" onclick="startLogin('CONSOLIDATED')">
           <div class="tag">Class Teacher Mode</div>
           <h3>Consolidated Entry</h3>
-          <p>Enter marks for all ${g.subjects.length} subjects of this group in one session — for the class teacher who manages the whole marksheet.</p>
+          <p>Enter marks for all ${g.subjects.length} subjects of this ${cls.groupWord.toLowerCase()} in one session — for the class teacher who manages the whole marksheet.</p>
         </div>
         <div class="choice-card" onclick="renderSubjectPicker()">
           <div class="tag">Subject Teacher Mode</div>
           <h3>Single Subject Entry</h3>
-          <p>Enter marks for just one subject you teach in this group.</p>
+          <p>Enter marks for just one subject you teach in this ${cls.groupWord.toLowerCase()}.</p>
         </div>
       </div>
     </div>`;
@@ -448,11 +524,17 @@ function renderModePicker(groupCode){
 
 function renderSubjectPicker(){
   const g = CONFIG.groups.find(x=>x.code===CURRENT_GROUP);
-  const chips = g.subjects.map(s => `
+  const chips = g.subjects.map(s => {
+    const parts = [];
+    if (s.hasTheory) parts.push(`Theory ${s.theoryMax}`);
+    if (s.hasPractical) parts.push(`Practical ${s.practicalMax}`);
+    if (subjectHasInternal(s)) parts.push(`Internal ${s.internalMax}`);
+    return `
     <div class="subject-chip" onclick="selectSubjectAndLogin('${s.name.replace(/'/g,"\\'")}')">
       ${s.name}
-      <small>${s.hasTheory? 'Theory '+s.theoryMax+' + ':''}${s.hasPractical? 'Practical '+s.practicalMax+' + ':''}Internal ${s.internalMax}</small>
-    </div>`).join('');
+      <small>${parts.join(' + ')}</small>
+    </div>`;
+  }).join('');
   root.innerHTML = `
     <div class="screen">
       <div class="back-link" onclick="renderModePicker('${CURRENT_GROUP}')">&larr; Back</div>
@@ -500,17 +582,27 @@ async function doLogin(){
   try{
     const res = await apiPost('login', {username, password});
     if (!res.success){ errEl.textContent = res.message || 'Invalid credentials.'; return; }
-    // permission check
-    const okGroup = res.groupCode === 'ALL' || res.groupCode === CURRENT_GROUP;
-    const okSubject = res.role === 'ADMIN' || res.subjectName === 'ALL' || res.subjectName === CURRENT_SUBJECT;
-    if (!okGroup || (CURRENT_MODE==='SUBJECT' && !okSubject)){
+    // A teacher may hold several permissions (e.g. class teacher of one
+    // section AND subject teacher in another) — the backend returns all of
+    // them in res.permissions. Access is granted if ANY single permission
+    // covers the group/subject/mode being requested here. Fall back to the
+    // old single-permission fields if an older backend is deployed.
+    const perms = res.permissions || [{role: res.role, groupCode: res.groupCode, subjectName: res.subjectName}];
+    const matchedPermission = perms.find(p => {
+      const okGroup = p.groupCode === 'ALL' || p.groupCode === CURRENT_GROUP;
+      const okSubject = p.role === 'ADMIN' || p.subjectName === 'ALL' || p.subjectName === CURRENT_SUBJECT;
+      return okGroup && (CURRENT_MODE !== 'SUBJECT' || okSubject);
+    });
+    if (!matchedPermission){
       errEl.textContent = "You don't have access to enter marks for this group/subject.";
       return;
     }
-    SESSION = res;
+    // Keep SESSION shaped as before (teacherName + the specific permission
+    // that unlocked this screen) so the rest of the app doesn't need to change.
+    SESSION = { ...res, ...matchedPermission };
     if (CURRENT_MODE === 'CONSOLIDATED') renderConsolidatedSubjectTabs();
     else renderMarksEntry(CURRENT_SUBJECT);
-  }catch(e){ errEl.textContent = 'Could not reach the server. Check API_URL / network.'; }
+  }catch(e){ errEl.textContent = 'Could not reach the server. Check the API URL for this class / your network.'; }
 }
 
 /* ================= CONSOLIDATED: subject tabs ================= */
@@ -552,7 +644,7 @@ async function renderMarksEntry(subjectName){
         <td class="name-cell">${st.name}</td>
         ${s.hasTheory ? `<td><input type="text" class="m-theory" value="${ex.theory ?? ''}" placeholder="/${s.theoryMax}" oninput="recalcRow(this)"></td>` : ''}
         ${s.hasPractical ? `<td><input type="text" class="m-practical" value="${ex.practical ?? ''}" placeholder="/${s.practicalMax}" oninput="recalcRow(this)"></td>` : ''}
-        <td><input type="text" class="m-internal" value="${ex.internal ?? ''}" placeholder="/${s.internalMax}" oninput="recalcRow(this)"></td>
+        ${subjectHasInternal(s) ? `<td><input type="text" class="m-internal" value="${ex.internal ?? ''}" placeholder="/${s.internalMax}" oninput="recalcRow(this)"></td>` : ''}
         <td class="cell-total">${r.totalDisplay}</td>
         <td><span class="result-tag ${r.status}">${r.resultLabel}</span></td>
       </tr>`;
@@ -565,8 +657,8 @@ async function renderMarksEntry(subjectName){
       <h2 class="title">${subjectName} &mdash; Marks Entry</h2>
       <div class="ledger-meta">
         <div><span class="k">Examination</span>${examLabel(CURRENT_EXAM)}</div>
-        <div><span class="k">Theory Pass Mark</span>${s.hasTheory ? s.theoryPass : (s.hasPractical ? '&mdash;' : '&mdash;')}</div>
-        <div><span class="k">Practical Pass Mark</span>${(!s.hasTheory && s.hasPractical) ? s.practicalPass : '&mdash;'}</div>
+        <div><span class="k">Theory Pass Mark</span>${s.hasTheory ? s.theoryPass : '&mdash;'}</div>
+        <div><span class="k">Practical Pass Mark</span>${s.hasPractical ? s.practicalPass : '&mdash;'}</div>
         <div><span class="k">Students</span>${students.length}</div>
       </div>
       <div class="autofill-bar">
@@ -582,7 +674,7 @@ async function renderMarksEntry(subjectName){
               <th>Reg. No.</th><th>Student Name</th>
               ${s.hasTheory ? `<th>Theory (${s.theoryMax})</th>` : ''}
               ${s.hasPractical ? `<th>Practical (${s.practicalMax})</th>` : ''}
-              <th>Internal (${s.internalMax})</th>
+              ${subjectHasInternal(s) ? `<th>Internal (${s.internalMax})</th>` : ''}
               <th>Total</th><th>Result</th>
             </tr>
           </thead>
@@ -634,7 +726,7 @@ function downloadSubjectMarksheet(){
   const highest = totalsOnly.length ? Math.max(...totalsOnly) : '&mdash;';
   const lowest = totalsOnly.length ? Math.min(...totalsOnly) : '&mdash;';
   const average = totalsOnly.length ? (totalsOnly.reduce((a,b)=>a+b,0)/totalsOnly.length).toFixed(2) : '&mdash;';
-  const subjectMax = (s.hasTheory?Number(s.theoryMax):0) + (s.hasPractical?Number(s.practicalMax):0) + Number(s.internalMax);
+  const subjectMax = (s.hasTheory?Number(s.theoryMax):0) + (s.hasPractical?Number(s.practicalMax):0) + (subjectHasInternal(s)?Number(s.internalMax):0);
 
   // Rank appeared students by total marks (standard ranking — ties share a rank).
   const ranked = scoredList.slice().sort((a,b)=> b.numericTotal - a.numericTotal);
@@ -659,7 +751,7 @@ function downloadSubjectMarksheet(){
         <td class="left">${r.name}</td>
         ${s.hasTheory ? `<td>${r.theory || '&mdash;'}</td>` : ''}
         ${s.hasPractical ? `<td>${r.practical || '&mdash;'}</td>` : ''}
-        <td>${r.internal || '&mdash;'}</td>
+        ${subjectHasInternal(s) ? `<td>${r.internal || '&mdash;'}</td>` : ''}
         <td><strong>${r.totalDisplay}</strong></td>
         <td><span class="stamp ${r.status}">${r.resultLabel}</span></td>
       </tr>`).join('');
@@ -698,7 +790,7 @@ function downloadSubjectMarksheet(){
             <th>Rank</th><th>Reg. No.</th><th class="left">Name</th>
             ${s.hasTheory ? `<th>Theory (${s.theoryMax})</th>` : ''}
             ${s.hasPractical ? `<th>Practical (${s.practicalMax})</th>` : ''}
-            <th>Internal (${s.internalMax})</th><th>Total (${subjectMax})</th><th>Result</th>
+            ${subjectHasInternal(s) ? `<th>Internal (${s.internalMax})</th>` : ''}<th>Total (${subjectMax})</th><th>Result</th>
           </tr></thead>
           <tbody>${marksheetRows}</tbody>
         </table>
@@ -754,25 +846,26 @@ function bandForScore(score){
    PENDING = not all applicable fields have been filled in yet. */
 function computeRowResult(theoryVal, practicalVal, internalVal, s){
   const norm = v => (v===undefined || v===null) ? '' : String(v).trim();
+  const hasInternal = subjectHasInternal(s);
   const theory = s.hasTheory ? norm(theoryVal) : null;
   const practical = s.hasPractical ? norm(practicalVal) : null;
-  const internal = norm(internalVal);
+  const internal = hasInternal ? norm(internalVal) : null;
   const isAA = v => v !== null && v !== '' && v.toUpperCase() === 'AA';
 
-  if ((s.hasTheory && isAA(theory)) || (s.hasPractical && isAA(practical)) || isAA(internal)){
+  if ((s.hasTheory && isAA(theory)) || (s.hasPractical && isAA(practical)) || (hasInternal && isAA(internal))){
     return {status:'ABSENT', totalDisplay:'AA', resultLabel:'ABSENT', numericTotal:null};
   }
-  const missing = (s.hasTheory && theory==='') || (s.hasPractical && practical==='') || internal==='';
+  const missing = (s.hasTheory && theory==='') || (s.hasPractical && practical==='') || (hasInternal && internal==='');
   if (missing){
     return {status:'PENDING', totalDisplay:'&mdash;', resultLabel:'PENDING', numericTotal:null};
   }
   const tN = s.hasTheory ? parseFloat(theory) : 0;
   const pN = s.hasPractical ? parseFloat(practical) : 0;
-  const iN = parseFloat(internal);
-  if ((s.hasTheory && isNaN(tN)) || (s.hasPractical && isNaN(pN)) || isNaN(iN)){
+  const iN = hasInternal ? parseFloat(internal) : 0;
+  if ((s.hasTheory && isNaN(tN)) || (s.hasPractical && isNaN(pN)) || (hasInternal && isNaN(iN))){
     return {status:'PENDING', totalDisplay:'&mdash;', resultLabel:'PENDING', numericTotal:null};
   }
-  const total = (s.hasTheory?tN:0) + (s.hasPractical?pN:0) + iN;
+  const total = (s.hasTheory?tN:0) + (s.hasPractical?pN:0) + (hasInternal?iN:0);
   const failTheory = s.hasTheory && tN < Number(s.theoryPass);
   const failPractical = s.hasPractical && pN < Number(s.practicalPass);
   const pass = !failTheory && !failPractical;
@@ -806,8 +899,10 @@ function applyAutofill(){
       const p = tr.querySelector('.m-practical');
       if (p && !p.value) p.value = s.practicalMax;
     }
-    const i = tr.querySelector('.m-internal');
-    if (i && !i.value) i.value = s.internalMax;
+    if (subjectHasInternal(s)){
+      const i = tr.querySelector('.m-internal');
+      if (i && !i.value) i.value = s.internalMax;
+    }
     recalcRowFromTr(tr);
   });
 }
@@ -822,7 +917,7 @@ async function submitMarksNow(){
     const rec = {regno};
     if (s.hasTheory) rec.theory = (tr.querySelector('.m-theory').value || '').trim();
     if (s.hasPractical) rec.practical = (tr.querySelector('.m-practical').value || '').trim();
-    rec.internal = (tr.querySelector('.m-internal').value || '').trim();
+    if (subjectHasInternal(s)) rec.internal = (tr.querySelector('.m-internal').value || '').trim();
     marks.push(rec);
   });
   statusEl.textContent = 'Submitting…';
@@ -914,6 +1009,7 @@ async function renderAnalysis(groupCode, examCode){
       </tr>`).join('');
 
   const subjectHeaders = a.subjects.map(s=>`<th>${s}</th>`).join('');
+  const grandMax = a.subjectStats.reduce((sum, s) => sum + (Number(s.totalMarks) || 0), 0);
 
   const bandLabels = ['=100','>=80 And <100','>=70 And <80','>=60 And <70','>=50 And <60','>=40 And <50','>=35 And <40','<35'];
   const subjectStatsRows = a.subjectStats.map(s => `
@@ -949,7 +1045,7 @@ async function renderAnalysis(groupCode, examCode){
       <p class="note">Result and rank per student. Absent students are excluded from pass/fail and rank. Rank is by total marks among students who appeared.</p>
       <div class="table-wrap">
         <table class="report">
-          <thead><tr><th>Rank</th><th>Reg. No.</th><th class="left">Name</th>${subjectHeaders}<th>Total (600)</th><th>Result</th></tr></thead>
+          <thead><tr><th>Rank</th><th>Reg. No.</th><th class="left">Name</th>${subjectHeaders}<th>Total (${grandMax})</th><th>Result</th></tr></thead>
           <tbody>${marksheetRows}</tbody>
         </table>
       </div>
@@ -1016,7 +1112,7 @@ function downloadConsolidatedPDF(groupCode, examCode){
 }
 
 /* ---------------- boot ---------------- */
-renderHome();
+renderClassSelect();
 </script>
 </body>
 </html>
