@@ -218,6 +218,18 @@ table.report td.left{text-align:left;}
   font-family:var(--mono); font-size:12.5px; padding:9px 16px; background:#fff; border:1px solid var(--rule); cursor:pointer;
 }
 .group-select-row button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+.picker-label{font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--brass-deep); margin:0 0 8px;}
+
+.exam-picker{margin-bottom:28px; padding:16px 18px; background:var(--paper-2); border:1px solid var(--rule);}
+.exam-picker .k{font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--brass-deep); margin-bottom:10px;}
+.exam-pill-row{display:flex; gap:10px; flex-wrap:wrap;}
+.exam-pill-row button{
+  font-family:var(--sans); font-size:12px; text-align:left; line-height:1.5; padding:8px 14px;
+  background:#fff; border:1px solid var(--rule); cursor:pointer; color:var(--ink);
+}
+.exam-pill-row button small{font-family:var(--mono); color:var(--text-soft); font-size:10.5px;}
+.exam-pill-row button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+.exam-pill-row button.active small{color:var(--brass);}
 
 .loading{font-family:var(--mono); font-size:13px; color:var(--text-soft); padding:20px 0;}
 footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-top:1px solid var(--rule); font-family:var(--mono);}
@@ -278,11 +290,26 @@ footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-
 const API_URL = "https://script.google.com/macros/s/AKfycbyKCkbWurh71uh6feX177X87tVw7yUY8tylsuVHibBvB5x9LIv35cKGSoudN-QgXeBr/exec";
 const SCHOOL_NAME = "Govt. Boys Higher Secondary School, Podaturpet-631208";
 
+/* ---------------- examination types ---------------- */
+const EXAMS = [
+  {code:'FMT_JUL26', name:'FIRST MIDTERM EXAM',       period:'JUL-2026'},
+  {code:'QE_SEP26',  name:'QUARTERLY EXAMINATION',     period:'SEP-2026'},
+  {code:'SMT_NOV26', name:'SECOND MID TERM EXAM',      period:'NOV-2026'},
+  {code:'HY_DEC26',  name:'HALF-YEARLY EXAMINATION',   period:'DEC-2026'},
+  {code:'RT1_JAN26', name:'FIRST REVISION TEST',       period:'JAN-2026'},
+  {code:'RT2_FEB26', name:'SECOND REVISION TEST',      period:'FEB-2026'}
+];
+function examLabel(code){
+  const e = EXAMS.find(x=>x.code===code);
+  return e ? `${e.name} \u2014 ${e.period}` : (code || 'Examination not selected');
+}
+
 /* ---------------- state ---------------- */
 let CONFIG = null;          // {groups:[...]}
 let CURRENT_GROUP = null;   // group code
 let CURRENT_MODE = null;    // 'CONSOLIDATED' | 'SUBJECT'
 let CURRENT_SUBJECT = null; // subject name (for SUBJECT mode, or active tab in CONSOLIDATED)
+let CURRENT_EXAM = EXAMS[0].code; // examination currently selected for entry
 let SESSION = null;         // login result
 
 document.getElementById('schoolNameHeader').textContent = SCHOOL_NAME;
@@ -317,6 +344,8 @@ function goAnalysis(){ renderAnalysisPicker(); }
 async function renderHome(){
   root.innerHTML = `<div class="screen"><div class="loading">Loading groups…</div></div>`;
   const cfg = await ensureConfig();
+  const examPills = EXAMS.map(e => `
+    <button class="${e.code===CURRENT_EXAM?'active':''}" data-exam="${e.code}" onclick="selectHomeExam('${e.code}')">${e.name}<br><small style="font-weight:400;">${e.period}</small></button>`).join('');
   const cards = cfg.groups.map(g => `
     <div class="index-card" onclick="renderModePicker('${g.code}')">
       <div class="code">${g.code}</div>
@@ -330,9 +359,19 @@ async function renderHome(){
       <div class="eyebrow">12th Standard &middot; Choose a Group</div>
       <h2 class="title">${SCHOOL_NAME}</h2>
       <p class="lede">Select a class group below to enter subject marks, or use <strong>Result Analysis</strong> in the top right to view the consolidated marksheet and statistics for a group.</p>
+      <div class="exam-picker">
+        <div class="k">Examination &mdash; marks will be entered for</div>
+        <div class="exam-pill-row" id="examPillRow">${examPills}</div>
+      </div>
       <div class="index-grid">${cards}</div>
     </div>`;
   cfg.groups.forEach(g => loadGroupStatus(g));
+}
+
+function selectHomeExam(code){
+  CURRENT_EXAM = code;
+  document.querySelectorAll('#examPillRow button').forEach(b=>b.classList.toggle('active', b.dataset.exam===code));
+  ensureConfig().then(cfg => cfg.groups.forEach(g => loadGroupStatus(g)));
 }
 
 /* A mark record only counts as "entered" if every field that applies to this
@@ -352,12 +391,15 @@ function isMarkFilled(m, s){
 async function loadGroupStatus(g){
   const box = document.getElementById(`status-${g.code}`);
   if (!box) return;
+  const examAtRequest = CURRENT_EXAM;
+  box.innerHTML = `<span class="loading" style="padding:0;">Checking entry status&hellip;</span>`;
   try{
     const studentsRes = await apiGet('students', {group: g.code});
     const total = (studentsRes.students || []).length;
     const marksResults = await Promise.all(
-      g.subjects.map(s => apiGet('marks', {group: g.code, subject: s.name}).catch(()=>({marks:[]})))
+      g.subjects.map(s => apiGet('marks', {group: g.code, subject: s.name, exam: examAtRequest}).catch(()=>({marks:[]})))
     );
+    if (examAtRequest !== CURRENT_EXAM) return; // exam changed again while this was loading
     let doneCount = 0;
     const rows = g.subjects.map((s, i) => {
       const marksArr = marksResults[i].marks || [];
@@ -386,7 +428,7 @@ function renderModePicker(groupCode){
   root.innerHTML = `
     <div class="screen">
       <div class="back-link" onclick="goHome()">&larr; Back to groups</div>
-      <div class="eyebrow">${g.code}</div>
+      <div class="eyebrow">${g.code} &middot; ${examLabel(CURRENT_EXAM)} <span class="back-link" style="margin:0 0 0 10px; display:inline;" onclick="goHome()">(change exam)</span></div>
       <h2 class="title">${g.name}</h2>
       <p class="lede">Choose how you'd like to enter marks for this group.</p>
       <div class="choice-row">
@@ -436,6 +478,7 @@ function startLogin(mode){
         <h2 class="title" style="text-align:center;font-size:22px;">Teacher Login</h2>
         <p class="lede" style="text-align:center;margin:0 0 10px;">
           ${mode==='CONSOLIDATED' ? `Class Teacher &mdash; ${CURRENT_GROUP}` : `${CURRENT_SUBJECT} &mdash; ${CURRENT_GROUP}`}
+          <br><span style="font-family:var(--mono); font-size:11.5px; color:var(--brass-deep);">${examLabel(CURRENT_EXAM)}</span>
         </p>
         <label>Username</label>
         <input type="text" id="loginUser" autocomplete="username">
@@ -476,7 +519,7 @@ function renderConsolidatedSubjectTabs(){
   const tabs = g.subjects.map(s=>`<button onclick="renderMarksEntry('${s.name.replace(/'/g,"\\'")}')">${s.name}</button>`).join('');
   root.innerHTML = `
     <div class="screen">
-      <div class="eyebrow">${g.code} &middot; Consolidated Entry &middot; ${SESSION.teacherName}</div>
+      <div class="eyebrow">${g.code} &middot; ${examLabel(CURRENT_EXAM)} &middot; Consolidated Entry &middot; ${SESSION.teacherName}</div>
       <h2 class="title">Pick a subject to enter</h2>
       <p class="lede">As class teacher you can enter marks for every subject below, one at a time.</p>
       <div class="group-select-row">${tabs}</div>
@@ -492,7 +535,7 @@ async function renderMarksEntry(subjectName){
 
   const [studentsRes, marksRes] = await Promise.all([
     apiGet('students', {group: CURRENT_GROUP}),
-    apiGet('marks', {group: CURRENT_GROUP, subject: subjectName})
+    apiGet('marks', {group: CURRENT_GROUP, subject: subjectName, exam: CURRENT_EXAM})
   ]);
   const students = studentsRes.students || [];
   const existing = {};
@@ -518,9 +561,10 @@ async function renderMarksEntry(subjectName){
   root.innerHTML = `
     <div class="screen">
       <div class="back-link" onclick="${backAction}">&larr; Back</div>
-      <div class="eyebrow">${g.code} &middot; ${SESSION.teacherName}</div>
+      <div class="eyebrow">${g.code} &middot; ${examLabel(CURRENT_EXAM)} &middot; ${SESSION.teacherName}</div>
       <h2 class="title">${subjectName} &mdash; Marks Entry</h2>
       <div class="ledger-meta">
+        <div><span class="k">Examination</span>${examLabel(CURRENT_EXAM)}</div>
         <div><span class="k">Theory Pass Mark</span>${s.hasTheory ? s.theoryPass : (s.hasPractical ? '&mdash;' : '&mdash;')}</div>
         <div><span class="k">Practical Pass Mark</span>${(!s.hasTheory && s.hasPractical) ? s.practicalPass : '&mdash;'}</div>
         <div><span class="k">Students</span>${students.length}</div>
@@ -637,6 +681,7 @@ function downloadSubjectMarksheet(){
   document.getElementById('printArea').innerHTML = `
     <div class="print-banner">
       <h2>${SCHOOL_NAME}</h2>
+      <div class="meta" style="font-size:13px; font-weight:700; letter-spacing:.05em; color:var(--brass-deep); margin-top:6px;">${examLabel(CURRENT_EXAM)}</div>
       <div class="meta">${g.code} &middot; ${g.name} &mdash; ${CURRENT_SUBJECT} Result Analysis</div>
       <div class="meta">Entered by: ${SESSION.teacherName} &middot; Printed: ${new Date().toLocaleString()}</div>
     </div>
@@ -783,7 +828,7 @@ async function submitMarksNow(){
   statusEl.textContent = 'Submitting…';
   statusEl.className = 'status-msg';
   try{
-    const res = await apiPost('submitMarks', {group: CURRENT_GROUP, subject: CURRENT_SUBJECT, marks});
+    const res = await apiPost('submitMarks', {group: CURRENT_GROUP, subject: CURRENT_SUBJECT, exam: CURRENT_EXAM, marks});
     if (res.success){
       statusEl.textContent = `Saved marks for ${res.updated} students.`;
       statusEl.className = 'status-msg ok';
@@ -798,24 +843,50 @@ async function submitMarksNow(){
 }
 
 /* ================= ANALYSIS ================= */
+let ANALYSIS_GROUP = null;
+let ANALYSIS_EXAM = null;
+
 async function renderAnalysisPicker(){
   root.innerHTML = `<div class="screen"><div class="loading">Loading groups…</div></div>`;
   const cfg = await ensureConfig();
-  const btns = cfg.groups.map(g=>`<button onclick="renderAnalysis('${g.code}')">${g.code}</button>`).join('');
+  ANALYSIS_GROUP = null;
+  ANALYSIS_EXAM = null;
+  const examBtns = EXAMS.map(e=>`<button data-exam="${e.code}" onclick="selectAnalysisExam('${e.code}')">${e.name} &mdash; ${e.period}</button>`).join('');
+  const groupBtns = cfg.groups.map(g=>`<button data-group="${g.code}" onclick="selectAnalysisGroup('${g.code}')">${g.code}</button>`).join('');
   root.innerHTML = `
     <div class="screen">
       <div class="eyebrow">Result Analysis</div>
-      <h2 class="title">Choose a group to view its results</h2>
-      <div class="group-select-row">${btns}</div>
+      <h2 class="title">Choose an examination and a group</h2>
+      <p class="lede">Select which examination's results you'd like to review, then pick a class group.</p>
+      <div class="picker-label">Examination</div>
+      <div class="group-select-row" id="examSelectRow">${examBtns}</div>
+      <div class="picker-label">Group</div>
+      <div class="group-select-row" id="groupSelectRow">${groupBtns}</div>
       <div id="analysisRoot"></div>
     </div>`;
 }
 
-async function renderAnalysis(groupCode){
-  document.querySelectorAll('.group-select-row button').forEach(b=>b.classList.toggle('active', b.textContent===groupCode));
+function selectAnalysisExam(code){
+  ANALYSIS_EXAM = code;
+  document.querySelectorAll('#examSelectRow button').forEach(b=>b.classList.toggle('active', b.dataset.exam===code));
+  maybeRenderAnalysis();
+}
+function selectAnalysisGroup(code){
+  ANALYSIS_GROUP = code;
+  document.querySelectorAll('#groupSelectRow button').forEach(b=>b.classList.toggle('active', b.dataset.group===code));
+  maybeRenderAnalysis();
+}
+function maybeRenderAnalysis(){
+  const target = document.getElementById('analysisRoot');
+  if (!ANALYSIS_EXAM){ target.innerHTML = `<div class="loading">Select an examination above to continue.</div>`; return; }
+  if (!ANALYSIS_GROUP){ target.innerHTML = `<div class="loading">Now select a group.</div>`; return; }
+  renderAnalysis(ANALYSIS_GROUP, ANALYSIS_EXAM);
+}
+
+async function renderAnalysis(groupCode, examCode){
   const target = document.getElementById('analysisRoot');
   target.innerHTML = `<div class="loading">Crunching the numbers…</div>`;
-  const a = await apiGet('analysis', {group: groupCode});
+  const a = await apiGet('analysis', {group: groupCode, exam: examCode});
   if (a.error){ target.innerHTML = `<div class="loading">${a.error}</div>`; return; }
 
   const o = a.overall;
@@ -866,8 +937,9 @@ async function renderAnalysis(groupCode){
     <tr><td class="left">${s.subject}</td><td>${s.failed}</td></tr>`).join('');
 
   target.innerHTML = `
+    <div class="eyebrow" style="margin-bottom:4px;">${examLabel(examCode)}</div>
     <div class="submit-bar no-print" style="margin:0 0 20px;">
-      <button class="btn" onclick="downloadConsolidatedPDF('${groupCode}')">Download Full Report (PDF)</button>
+      <button class="btn" onclick="downloadConsolidatedPDF('${groupCode}','${examCode}')">Download Full Report (PDF)</button>
     </div>
 
     ${overallCards}
@@ -929,12 +1001,13 @@ async function renderAnalysis(groupCode){
    tables) into the print-only area with a proper header, and prints it —
    this is what the class teacher uses to save the full consolidated result
    as a PDF. */
-function downloadConsolidatedPDF(groupCode){
+function downloadConsolidatedPDF(groupCode, examCode){
   const g = CONFIG.groups.find(x=>x.code===groupCode);
   const analysisContent = document.getElementById('analysisRoot').innerHTML;
   document.getElementById('printArea').innerHTML = `
     <div class="print-banner">
       <h2>${SCHOOL_NAME}</h2>
+      <div class="meta" style="font-size:13px; font-weight:700; letter-spacing:.05em; color:var(--brass-deep); margin-top:6px;">${examLabel(examCode)}</div>
       <div class="meta">${g.code} &middot; ${g.name} &mdash; Consolidated Result Report</div>
       <div class="meta">Printed: ${new Date().toLocaleString()}</div>
     </div>
