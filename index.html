@@ -535,7 +535,7 @@ function isMarkFilled(m, s){
   const has = v => v !== undefined && v !== null && String(v).trim() !== '';
   if (s.hasTheory && !has(m.theory)) return false;
   if (s.hasPractical && !has(m.practical)) return false;
-  if (!has(m.internal)) return false;
+  if (subjectHasInternal(s) && !has(m.internal)) return false;
   return true;
 }
 
@@ -807,8 +807,10 @@ function downloadSubjectMarksheet(){
   const average = totalsOnly.length ? (totalsOnly.reduce((a,b)=>a+b,0)/totalsOnly.length).toFixed(2) : '&mdash;';
   const subjectMax = (s.hasTheory?Number(s.theoryMax):0) + (s.hasPractical?Number(s.practicalMax):0) + (subjectHasInternal(s)?Number(s.internalMax):0);
 
-  // Rank appeared students by total marks (standard ranking — ties share a rank).
-  const ranked = scoredList.slice().sort((a,b)=> b.numericTotal - a.numericTotal);
+  // Rank appeared students by total marks — but only those who PASSED.
+  // A failed student is excluded from ranking too, same as absent students.
+  const rankableList = scoredList.filter(r=>r.status==='PASS');
+  const ranked = rankableList.slice().sort((a,b)=> b.numericTotal - a.numericTotal);
   let rank = 0, prevTotal = null, seen = 0;
   const rankMap = {};
   ranked.forEach(r=>{
@@ -862,7 +864,7 @@ function downloadSubjectMarksheet(){
 
     <div class="section-block">
       <h3>${CURRENT_SUBJECT} &mdash; Marksheet</h3>
-      <p class="note">Result per student for this subject. Absent students are excluded from pass/fail and rank. Rank is by total marks among students who appeared.</p>
+      <p class="note">Result per student for this subject. Absent students are excluded from pass/fail; rank is given only to students who passed.</p>
       <div class="table-wrap">
         <table class="report">
           <thead><tr>
@@ -1019,6 +1021,8 @@ async function submitMarksNow(){
 /* ================= ANALYSIS ================= */
 let ANALYSIS_GROUP = null;
 let ANALYSIS_EXAM = null;
+let ANALYSIS_DATA = null;      // cached last-fetched consolidated analysis, so toggling sort order doesn't need a re-fetch
+let ANALYSIS_SORT = 'regno';   // 'regno' (default) | 'rank'
 
 async function renderAnalysisPicker(){
   root.innerHTML = `<div class="screen"><div class="loading">Loading groups…</div></div>`;
@@ -1057,11 +1061,52 @@ function maybeRenderAnalysis(){
   renderAnalysis(ANALYSIS_GROUP, ANALYSIS_EXAM);
 }
 
+/* Sorts the consolidated marksheet either by Register No. (default, natural
+   alphanumeric order) or by Rank (students who passed, ranked lowest-first;
+   everyone else — fail/absent/pending — has no rank and is listed after). */
+function sortMarksheet(marksheet, mode){
+  const rows = marksheet.slice();
+  if (mode === 'rank'){
+    rows.sort((x,y)=> (x.rank===''?9999:x.rank) - (y.rank===''?9999:y.rank));
+  } else {
+    rows.sort((x,y)=> String(x.regno).localeCompare(String(y.regno), undefined, {numeric:true, sensitivity:'base'}));
+  }
+  return rows;
+}
+
+function buildMarksheetRows(marksheet){
+  return marksheet.map(st => `
+      <tr>
+        <td class="left">${st.rank || '&mdash;'}</td>
+        <td class="reg-cell left">${st.regno}</td>
+        <td class="left">${st.name}</td>
+        ${st.subjects.map(sub => `<td>${sub.pass==='ABSENT' ? 'AA' : (sub.total ?? '&mdash;')}</td>`).join('')}
+        <td><strong>${st.total ?? '&mdash;'}</strong></td>
+        <td><span class="stamp ${st.status}">${st.status}</span></td>
+      </tr>`).join('');
+}
+
+/* Re-sorts and re-renders just the marksheet table body — no re-fetch needed. */
+function setAnalysisSort(mode){
+  ANALYSIS_SORT = mode;
+  document.querySelectorAll('#marksheetSortRow button').forEach(b=>b.classList.toggle('active', b.dataset.sort===mode));
+  const body = document.getElementById('consolidatedMarksheetBody');
+  if (body) body.innerHTML = buildMarksheetRows(sortMarksheet(ANALYSIS_DATA.marksheet, ANALYSIS_SORT));
+}
+
 async function renderAnalysis(groupCode, examCode){
   const target = document.getElementById('analysisRoot');
   target.innerHTML = `<div class="loading">Crunching the numbers…</div>`;
   const a = await apiGet('analysis', {group: groupCode, exam: examCode});
   if (a.error){ target.innerHTML = `<div class="loading">${a.error}</div>`; return; }
+  ANALYSIS_DATA = a;
+  ANALYSIS_SORT = 'regno';
+  renderAnalysisBody(groupCode, examCode);
+}
+
+function renderAnalysisBody(groupCode, examCode){
+  const target = document.getElementById('analysisRoot');
+  const a = ANALYSIS_DATA;
 
   const o = a.overall;
   const overallCards = `
@@ -1074,18 +1119,7 @@ async function renderAnalysis(groupCode, examCode){
       <div class="stat-card"><div class="num">${o.passPercentage}%</div><div class="lbl">Pass Percentage</div></div>
     </div>`;
 
-  const marksheetRows = a.marksheet
-    .slice()
-    .sort((x,y)=> (x.rank===''?9999:x.rank) - (y.rank===''?9999:y.rank))
-    .map(st => `
-      <tr>
-        <td class="left">${st.rank || '&mdash;'}</td>
-        <td class="reg-cell left">${st.regno}</td>
-        <td class="left">${st.name}</td>
-        ${st.subjects.map(sub => `<td>${sub.pass==='ABSENT' ? 'AA' : (sub.total ?? '&mdash;')}</td>`).join('')}
-        <td><strong>${st.total ?? '&mdash;'}</strong></td>
-        <td><span class="stamp ${st.status}">${st.status}</span></td>
-      </tr>`).join('');
+  const marksheetRows = buildMarksheetRows(sortMarksheet(a.marksheet, ANALYSIS_SORT));
 
   const subjectHeaders = a.subjects.map(s=>`<th>${s}</th>`).join('');
   const grandMax = a.subjectStats.reduce((sum, s) => sum + (Number(s.totalMarks) || 0), 0);
@@ -1121,11 +1155,15 @@ async function renderAnalysis(groupCode, examCode){
 
     <div class="section-block">
       <h3>Consolidated Marksheet</h3>
-      <p class="note">Result and rank per student. Absent students are excluded from pass/fail and rank. Rank is by total marks among students who appeared.</p>
+      <p class="note">Result and rank per student. Absent and failed students are excluded from rank; rank is given only to students who passed.</p>
+      <div class="group-select-row no-print" id="marksheetSortRow" style="margin-bottom:14px;">
+        <button class="${ANALYSIS_SORT==='regno'?'active':''}" data-sort="regno" onclick="setAnalysisSort('regno')">Reg. No. wise</button>
+        <button class="${ANALYSIS_SORT==='rank'?'active':''}" data-sort="rank" onclick="setAnalysisSort('rank')">Rank wise</button>
+      </div>
       <div class="table-wrap">
         <table class="report">
           <thead><tr><th>Rank</th><th>Reg. No.</th><th class="left">Name</th>${subjectHeaders}<th>Total (${grandMax})</th><th>Result</th></tr></thead>
-          <tbody>${marksheetRows}</tbody>
+          <tbody id="consolidatedMarksheetBody">${marksheetRows}</tbody>
         </table>
       </div>
     </div>
