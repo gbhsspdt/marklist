@@ -1055,11 +1055,14 @@ async function renderAnalysisPicker(){
     <div class="screen">
       <div class="eyebrow">Result Analysis</div>
       <h2 class="title">Choose an examination and a group</h2>
-      <p class="lede">Select which examination's results you'd like to review, then pick a class group.</p>
+      <p class="lede">Select which examination's results you'd like to review, then pick a class group — or view the overall result combined across every section.</p>
       <div class="picker-label">Examination</div>
       <div class="group-select-row" id="examSelectRow">${examBtns}</div>
       <div class="picker-label">Group</div>
-      <div class="group-select-row" id="groupSelectRow">${groupBtns}</div>
+      <div class="group-select-row" id="groupSelectRow">
+        <button data-group="__OVERALL__" onclick="selectAnalysisGroup('__OVERALL__')" style="border-color:var(--brass); color:var(--brass-deep); font-weight:700;">&#9733; Overall (All Sections)</button>
+        ${groupBtns}
+      </div>
       <div id="analysisRoot"></div>
     </div>`;
 }
@@ -1078,7 +1081,101 @@ function maybeRenderAnalysis(){
   const target = document.getElementById('analysisRoot');
   if (!ANALYSIS_EXAM){ target.innerHTML = `<div class="loading">Select an examination above to continue.</div>`; return; }
   if (!ANALYSIS_GROUP){ target.innerHTML = `<div class="loading">Now select a group.</div>`; return; }
+  if (ANALYSIS_GROUP === '__OVERALL__'){ renderOverallAnalysis(ANALYSIS_EXAM); return; }
   renderAnalysis(ANALYSIS_GROUP, ANALYSIS_EXAM);
+}
+
+/* ============== OVERALL (ALL SECTIONS) RESULT ============== */
+let OVERALL_DATA = null; // cached last-fetched overall analysis
+
+async function renderOverallAnalysis(examCode){
+  const target = document.getElementById('analysisRoot');
+  target.innerHTML = `<div class="loading">Combining every section…</div>`;
+  const a = await apiGet('overallAnalysis', {exam: examCode});
+  if (a.error){ target.innerHTML = `<div class="loading">${a.error}</div>`; return; }
+  OVERALL_DATA = a;
+  renderOverallAnalysisBody(examCode);
+}
+
+function renderOverallAnalysisBody(examCode){
+  const target = document.getElementById('analysisRoot');
+  const a = OVERALL_DATA;
+  const o = a.overall;
+
+  const overallCards = `
+    <div class="stat-cards">
+      <div class="stat-card"><div class="num">${o.totalStudents}</div><div class="lbl">Total Students</div></div>
+      <div class="stat-card"><div class="num">${o.absent}</div><div class="lbl">Absent</div></div>
+      <div class="stat-card"><div class="num">${o.appeared}</div><div class="lbl">Appeared</div></div>
+      <div class="stat-card"><div class="num">${o.passed}</div><div class="lbl">Passed</div></div>
+      <div class="stat-card"><div class="num">${o.failed}</div><div class="lbl">Failed</div></div>
+      <div class="stat-card"><div class="num">${o.passPercentage}%</div><div class="lbl">Pass Percentage</div></div>
+      <div class="stat-card"><div class="num">${o.average}</div><div class="lbl">Average Marks</div></div>
+    </div>`;
+
+  const subjectRows = a.subjectWise.map(s => `
+    <tr>
+      <td class="left">${s.subject}</td>
+      <td>${s.totalStudents}</td><td>${s.absent}</td><td>${s.appeared}</td>
+      <td>${s.passed}</td><td>${s.failed}</td><td>${s.passPercentage}%</td><td>${s.average}</td>
+    </tr>`).join('');
+
+  const teacherRows = a.teacherWise.map(t => `
+    <tr>
+      <td class="left">${t.teacherName}</td>
+      <td class="left">${t.subject}</td>
+      <td class="left">${t.groups.join(', ')}</td>
+      <td>${t.totalStudents}</td><td>${t.appeared}</td>
+      <td>${t.passed}</td><td>${t.failed}</td><td>${t.passPercentage}%</td><td>${t.average}</td>
+    </tr>`).join('');
+
+  target.innerHTML = `
+    <div class="eyebrow" style="margin-bottom:4px;">${examLabel(examCode)}</div>
+    <div class="submit-bar no-print" style="margin:0 0 20px;">
+      <button class="btn" onclick="downloadOverallPDF('${examCode}')">Download Overall Report (PDF)</button>
+    </div>
+
+    <div class="section-block">
+      <h3>Overall Consolidated Result &mdash; All Sections</h3>
+      <p class="note">Combined abstract across every section of this class for this examination.</p>
+      ${overallCards}
+    </div>
+
+    <div class="section-block">
+      <h3>Subject-wise Result (All Sections Combined)</h3>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr><th class="left">Subject</th><th>Total</th><th>Absent</th><th>Appeared</th><th>Passed</th><th>Failed</th><th>Pass %</th><th>Average</th></tr></thead>
+          <tbody>${subjectRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h3>Teacher-wise Result</h3>
+      <p class="note">Each subject teacher's combined performance across every section/group they teach that subject in.</p>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr><th class="left">Teacher</th><th class="left">Subject</th><th class="left">Group(s)</th><th>Total</th><th>Appeared</th><th>Passed</th><th>Failed</th><th>Pass %</th><th>Average</th></tr></thead>
+          <tbody>${teacherRows || '<tr><td colspan="9" class="left">No subject-teacher permissions found in the Teachers sheet.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+/* Clones the overall (all-sections) report into the print area and prints it. */
+function downloadOverallPDF(examCode){
+  const analysisContent = document.getElementById('analysisRoot').innerHTML;
+  document.getElementById('printArea').innerHTML = `
+    <div class="print-banner">
+      <h2>${SCHOOL_NAME}</h2>
+      <div class="meta" style="font-size:13px; font-weight:700; letter-spacing:.05em; color:var(--brass-deep); margin-top:6px;">${examLabel(examCode)}</div>
+      <div class="meta">${CLASSES[CURRENT_CLASS].label} &mdash; Overall Consolidated Result (All Sections)</div>
+      <div class="meta">Printed: ${new Date().toLocaleString()}</div>
+    </div>
+    ${analysisContent}`;
+  window.print();
 }
 
 /* Sorts the consolidated marksheet either by Register No. (default, natural
