@@ -230,6 +230,24 @@ table.report td.left{text-align:left;}
 .stamp.ABSENT{color:var(--absent); border-color:var(--absent);}
 .stamp.PENDING{color:var(--text-soft); border-color:var(--rule);}
 
+.link-count{
+  font-family:var(--mono); font-weight:700; font-size:13px; color:var(--brass);
+  background:none; border:none; cursor:pointer; padding:2px 6px; border-radius:6px;
+  text-decoration:underline; text-underline-offset:3px;
+}
+.link-count:hover{background:rgba(180,140,60,.12);}
+.detail-row td{background:#fbf9f4 !important; text-align:left;}
+.detail-panel{
+  margin-top:10px; padding:14px 16px; background:#fbf9f4; border:1px solid var(--rule);
+  border-left:4px solid var(--brass); border-radius:10px; display:none;
+}
+.detail-panel .detail-title{font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-soft); margin-bottom:10px;}
+.chip-row{display:flex; flex-wrap:wrap; gap:8px;}
+.chip{
+  font-family:var(--mono); font-size:12px; background:#fff; border:1px solid var(--rule);
+  border-radius:999px; padding:5px 12px; white-space:nowrap;
+}
+
 .group-select-row{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:28px;}
 .group-select-row button{
   font-family:var(--mono); font-size:12.5px; padding:9px 18px; background:#fff; border:1px solid var(--rule); border-radius:999px; cursor:pointer;
@@ -347,6 +365,8 @@ footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-
   #printArea table.report, #printArea table.ledger{font-size:11px;}
   #printArea .section-block, #printArea .stat-cards{break-inside:avoid; page-break-inside:avoid;}
   #printArea .stamp{border-width:1.5px;}
+  #printArea .link-count{color:inherit; text-decoration:none; cursor:default; pointer-events:none; font-weight:700;}
+  #printArea .detail-row, #printArea .detail-panel{display:none !important;}
 }
 </style>
 </head>
@@ -1139,11 +1159,25 @@ function renderAnalysisBody(groupCode, examCode){
       ${bandLabels.map(b=>`<td>${s.bands[b]}</td>`).join('')}
     </tr>`).join('');
 
+  // "Number of Students Failed in N Subjects" — backend already excludes the
+  // 0-subjects bucket. Each non-zero count is clickable to reveal names.
   const failDistKeys = Object.keys(a.failDistribution);
-  const failDistRow = failDistKeys.map(k=>`<td>${a.failDistribution[k]}</td>`).join('');
+  const failDistHeaderCells = failDistKeys.map(k=>`<th>${k} Subject${Number(k)>1?'s':''}</th>`).join('');
+  const failDistCountCells = failDistKeys.map(k=>{
+    const bucket = a.failDistribution[k];
+    return `<td>${bucket.count>0 ? `<button class="link-count" onclick="toggleFailDistDetail('${k}')">${bucket.count}</button>` : bucket.count}</td>`;
+  }).join('');
 
-  const subjFailRows = a.subjectFailures.map(s=>`
-    <tr><td class="left">${s.subject}</td><td>${s.failed}</td></tr>`).join('');
+  // "Subject-wise Number of Failures" — each row's count is clickable,
+  // opening an inline row underneath with the failed students' names.
+  const subjFailRows = a.subjectFailures.map((s, idx) => `
+    <tr>
+      <td class="left">${s.subject}</td>
+      <td>${s.failed>0 ? `<button class="link-count" onclick="toggleSubjectFailDetail(${idx})">${s.failed}</button>` : s.failed}</td>
+    </tr>
+    <tr class="detail-row" id="subjFailDetail-${idx}" style="display:none;">
+      <td colspan="2"><div class="chip-row"></div></td>
+    </tr>`).join('');
 
   target.innerHTML = `
     <div class="eyebrow" style="margin-bottom:4px;">${examLabel(examCode)}</div>
@@ -1190,16 +1224,19 @@ function renderAnalysisBody(groupCode, examCode){
 
     <div class="section-block">
       <h3>Number of Students Failed in N Subjects</h3>
+      <p class="note">Click a number to see the students in that bucket.</p>
       <div class="table-wrap">
         <table class="report">
-          <thead><tr>${failDistKeys.map(k=>`<th>${k} Subject${k>1?'s':''}</th>`).join('')}</tr></thead>
-          <tbody><tr>${failDistRow}</tr></tbody>
+          <thead><tr>${failDistHeaderCells}</tr></thead>
+          <tbody><tr>${failDistCountCells}</tr></tbody>
         </table>
       </div>
+      <div class="detail-panel" id="failDistDetail"></div>
     </div>
 
     <div class="section-block">
       <h3>Subject-wise Number of Failures</h3>
+      <p class="note">Click a number to see which students failed that subject.</p>
       <div class="table-wrap">
         <table class="report">
           <thead><tr><th class="left">Subject</th><th>No. Failed</th></tr></thead>
@@ -1208,6 +1245,40 @@ function renderAnalysisBody(groupCode, examCode){
       </div>
     </div>
   `;
+}
+
+/* Toggles the shared detail panel under "Number of Students Failed in N
+   Subjects", showing the regno/name of every student in that bucket.
+   Clicking the same number again collapses it. */
+function toggleFailDistDetail(n){
+  const panel = document.getElementById('failDistDetail');
+  if (!panel) return;
+  if (panel.dataset.active === String(n)){
+    panel.style.display = 'none';
+    panel.dataset.active = '';
+    return;
+  }
+  const bucket = ANALYSIS_DATA.failDistribution[n];
+  const names = bucket.students.map(s=>`<span class="chip">${s.regno} &mdash; ${s.name}</span>`).join('');
+  panel.innerHTML = `<div class="detail-title">Failed in ${n} subject${Number(n)>1?'s':''} (${bucket.count})</div><div class="chip-row">${names || '<em>None</em>'}</div>`;
+  panel.style.display = 'block';
+  panel.dataset.active = String(n);
+}
+
+/* Toggles the inline detail row under a subject in "Subject-wise Number of
+   Failures", showing which students failed that particular subject. */
+function toggleSubjectFailDetail(idx){
+  const row = document.getElementById('subjFailDetail-'+idx);
+  if (!row) return;
+  const isOpen = row.style.display !== 'none';
+  if (isOpen){
+    row.style.display = 'none';
+    return;
+  }
+  const s = ANALYSIS_DATA.subjectFailures[idx];
+  const names = s.students.map(st=>`<span class="chip">${st.regno} &mdash; ${st.name}</span>`).join('');
+  row.querySelector('.chip-row').innerHTML = names || '<em>None</em>';
+  row.style.display = 'table-row';
 }
 
 /* Clones the already-rendered consolidated analysis (marksheet + all stat
