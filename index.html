@@ -1129,6 +1129,23 @@ function renderOverallAnalysisBody(examCode){
       <td>${t.passed}</td><td>${t.failed}</td><td>${t.passPercentage}%</td><td>${t.average}</td>
     </tr>`).join('');
 
+  // Group-wise failed-students breakdown (1..maxN subjects failed), with a
+  // combined Total row across every group. Each non-zero count is clickable.
+  const gfw = a.groupFailWise;
+  const nList = Array.from({length: gfw.maxN}, (_, i) => i + 1);
+  const failColHeaders = nList.map(n => `<th>${n} Subject${n>1?'s':''}</th>`).join('');
+  const groupFailRows = gfw.groups.map(g => {
+    const cells = nList.map(n => {
+      const b = g.buckets[n];
+      return `<td>${b.count>0 ? `<button class="link-count" onclick="toggleGroupFailDetail('${g.groupCode}', ${n})">${b.count}</button>` : b.count}</td>`;
+    }).join('');
+    return `<tr><td class="left">${g.groupCode}</td>${cells}</tr>`;
+  }).join('');
+  const totalFailCells = nList.map(n => {
+    const b = gfw.totals[n];
+    return `<td>${b.count>0 ? `<button class="link-count" onclick="toggleGroupFailDetail('__TOTAL__', ${n})">${b.count}</button>` : b.count}</td>`;
+  }).join('');
+
   target.innerHTML = `
     <div class="eyebrow" style="margin-bottom:4px;">${examLabel(examCode)}</div>
     <div class="submit-bar no-print" style="margin:0 0 20px;">
@@ -1161,7 +1178,48 @@ function renderOverallAnalysisBody(examCode){
         </table>
       </div>
     </div>
+
+    <div class="section-block">
+      <h3>Group-wise Failed Students (By No. of Subjects Failed)</h3>
+      <p class="note">Click a number to see the students in that bucket, along with the subjects they failed.</p>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr><th class="left">Group</th>${failColHeaders}</tr></thead>
+          <tbody>
+            ${groupFailRows}
+            <tr style="font-weight:700;"><td class="left">Total</td>${totalFailCells}</tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="detail-panel" id="groupFailDetail"></div>
+    </div>
   `;
+}
+
+/* Toggles the shared detail panel under "Group-wise Failed Students",
+   showing regno/name and the failed subject list for every student in that
+   group+failCount bucket (or, for the Total row, across all groups). */
+function toggleGroupFailDetail(groupKey, n){
+  const panel = document.getElementById('groupFailDetail');
+  if (!panel) return;
+  const activeKey = groupKey + '|' + n;
+  if (panel.dataset.active === activeKey){
+    panel.style.display = 'none';
+    panel.dataset.active = '';
+    return;
+  }
+  const gfw = OVERALL_DATA.groupFailWise;
+  const bucket = groupKey === '__TOTAL__'
+    ? gfw.totals[n]
+    : gfw.groups.find(g => g.groupCode === groupKey).buckets[n];
+  const label = groupKey === '__TOTAL__' ? 'All Groups (Total)' : groupKey;
+  const chips = bucket.students.map(s => {
+    const groupTag = s.group ? `[${s.group}] ` : '';
+    return `<span class="chip">${groupTag}${s.regno} &mdash; ${s.name} <em>(Failed: ${s.subjects.join(', ')})</em></span>`;
+  }).join('');
+  panel.innerHTML = `<div class="detail-title">${label} &mdash; Failed in ${n} subject${Number(n)>1?'s':''} (${bucket.count})</div><div class="chip-row">${chips || '<em>None</em>'}</div>`;
+  panel.style.display = 'block';
+  panel.dataset.active = activeKey;
 }
 
 /* Clones the overall (all-sections) report into the print area and prints it. */
