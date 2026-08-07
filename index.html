@@ -1336,9 +1336,11 @@ function renderAnalysisBody(groupCode, examCode){
 
   target.innerHTML = `
     <div class="eyebrow" style="margin-bottom:4px;">${examLabel(examCode)}</div>
-    <div class="submit-bar no-print" style="margin:0 0 20px;">
+    <div class="submit-bar no-print" style="margin:0 0 20px; display:flex; gap:10px; flex-wrap:wrap;">
       <button class="btn" onclick="downloadConsolidatedPDF('${groupCode}','${examCode}')">Download Full Report (PDF)</button>
+      <button class="btn secondary" onclick="generateReportCards('${groupCode}','${examCode}')">Report Cards &amp; WhatsApp Send</button>
     </div>
+    <div id="reportCardsPanel" class="section-block no-print" style="display:none;"></div>
 
     ${overallCards}
 
@@ -1452,6 +1454,46 @@ function downloadConsolidatedPDF(groupCode, examCode){
     </div>
     ${analysisContent}`;
   window.print();
+}
+
+/* Calls the backend to generate one PDF report card per student (saved to
+   Drive, shared as view-only) and a ready-to-tap WhatsApp link for each.
+   The teacher then taps "Send" next to each student — WhatsApp opens with
+   the message (including the PDF link) pre-filled, one tap to send. */
+async function generateReportCards(groupCode, examCode){
+  const panel = document.getElementById('reportCardsPanel');
+  panel.style.display = 'block';
+  panel.innerHTML = `<h3>Report Cards &amp; WhatsApp Send</h3><div class="loading">Generating PDF report cards for every student… this can take a little while for a large class.</div>`;
+  const res = await apiPost('generateReportCards', {group: groupCode, exam: examCode});
+  if (res.error){ panel.innerHTML = `<h3>Report Cards &amp; WhatsApp Send</h3><div class="loading">${res.error}</div>`; return; }
+  REPORT_CARDS_DATA = res.students;
+  renderReportCardsPanel();
+}
+
+let REPORT_CARDS_DATA = [];
+
+function renderReportCardsPanel(){
+  const panel = document.getElementById('reportCardsPanel');
+  const missing = REPORT_CARDS_DATA.filter(s => !s.phone).length;
+  const rows = REPORT_CARDS_DATA.map(s => `
+    <tr>
+      <td class="left">${s.regno}</td>
+      <td class="left">${s.name}</td>
+      <td>${s.total ?? '&mdash;'}</td>
+      <td><span class="stamp ${s.status}">${s.status}</span></td>
+      <td class="left">${s.phone ? s.phone : '<em style="color:var(--fail);">No number in Contacts sheet</em>'}</td>
+      <td><a href="${s.pdfUrl}" target="_blank" rel="noopener">View PDF</a></td>
+      <td>${s.waLink ? `<button class="btn" style="padding:7px 14px; font-size:12px;" onclick="window.open('${s.waLink}','_blank')">Send via WhatsApp</button>` : '<em>Add number</em>'}</td>
+    </tr>`).join('');
+  panel.innerHTML = `
+    <h3>Report Cards &amp; WhatsApp Send</h3>
+    <p class="note">One PDF report card was generated per student and saved to your Drive. Tap "Send via WhatsApp" next to each student — it opens WhatsApp with the message and PDF link ready, you just tap Send there. ${missing ? `<strong style="color:var(--fail);">${missing} student(s) have no phone number in the "Contacts" sheet yet.</strong>` : ''}</p>
+    <div class="table-wrap">
+      <table class="report">
+        <thead><tr><th class="left">Reg. No.</th><th class="left">Name</th><th>Total</th><th>Result</th><th class="left">Parent WhatsApp</th><th>Report Card</th><th>Send</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 /* ---------------- boot ---------------- */
