@@ -1464,7 +1464,7 @@ async function generateReportCards(groupCode, examCode){
   const panel = document.getElementById('reportCardsPanel');
   panel.style.display = 'block';
   panel.innerHTML = `<h3>Report Cards &amp; WhatsApp Send</h3><div class="loading">Generating PDF report cards for every student… this can take a little while for a large class.</div>`;
-  const res = await apiPost('generateReportCards', {group: groupCode, exam: examCode});
+  const res = await apiPost('generateReportCards', {group: groupCode, exam: examCode, examLabel: examLabel(examCode)});
   if (res.error){ panel.innerHTML = `<h3>Report Cards &amp; WhatsApp Send</h3><div class="loading">${res.error}</div>`; return; }
   REPORT_CARDS_DATA = res.students;
   renderReportCardsPanel();
