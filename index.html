@@ -176,13 +176,13 @@ input:focus{outline:2px solid var(--brass); outline-offset:1px;}
   display:flex; align-items:center; gap:10px; margin-bottom:18px; padding:12px 16px;
   background:var(--paper-2); border:1px dashed var(--rule); border-radius:12px; font-size:13px;
 }
-table.ledger{width:100%; border-collapse:collapse; font-size:14px; background:#fff; border-radius:12px; overflow:hidden;}
+table.ledger{width:100%; border-collapse:collapse; font-size:14px; background:#fff; border-radius:12px; overflow:hidden; border:1px solid var(--rule);}
 table.ledger thead th{
   font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
-  background:linear-gradient(120deg, var(--ink), var(--ink-2)); color:#fff; padding:10px 8px; text-align:center; border-right:1px solid rgba(255,255,255,.12);
+  background:linear-gradient(120deg, var(--ink), var(--ink-2)); color:#fff; padding:10px 8px; text-align:center; border:1px solid rgba(255,255,255,.2);
 }
 table.ledger tbody td{
-  padding:7px 8px; border-bottom:1px solid var(--rule); border-right:1px solid #f1f0fb; text-align:center;
+  padding:7px 8px; border:1px solid var(--rule); text-align:center;
 }
 table.ledger tbody tr:nth-child(odd){background:#faf9ff;}
 table.ledger td.name-cell{text-align:left; font-family:var(--sans); font-size:13.5px;}
@@ -213,9 +213,10 @@ table.ledger input:focus{outline:2px solid var(--brass);}
 .section-block h3{font-family:var(--serif); font-weight:600; font-size:21px; color:var(--ink); margin:0 0 4px; border-bottom:3px solid var(--brass); padding-bottom:8px; display:inline-block;}
 .section-block .note{font-size:12.5px; color:var(--text-soft); margin:6px 0 16px;}
 .table-wrap{overflow-x:auto;}
-table.report{width:100%; border-collapse:collapse; font-size:13px; background:#fff; min-width:640px; border-radius:12px; overflow:hidden;}
-table.report th{background:linear-gradient(120deg, var(--ink), var(--ink-2)); color:#fff; padding:8px 10px; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; text-align:center;}
-table.report td{padding:7px 10px; border-bottom:1px solid var(--rule); text-align:center;}
+table.report{width:100%; border-collapse:collapse; font-size:13px; background:#fff; min-width:640px; border-radius:12px; overflow:hidden; border:1px solid var(--rule);}
+table.report th{background:linear-gradient(120deg, var(--ink), var(--ink-2)); color:#fff; padding:8px 10px; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; text-align:center; border:1px solid rgba(255,255,255,.2);}
+table.report td{padding:7px 10px; border:1px solid var(--rule); text-align:center;}
+table.report td.num, table.report td:not(.left){max-width:70px;}
 table.report tbody tr:nth-child(odd){background:#faf9ff;}
 table.report td.left{text-align:left;}
 
@@ -357,12 +358,65 @@ footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-
 .print-banner h2{font-family:var(--serif); font-size:22px; margin:0 0 6px; color:var(--ink);}
 .print-banner .meta{font-family:var(--mono); font-size:11px; color:#444; margin-top:2px;}
 @media print{
-  @page{ size: A4 portrait; margin:14mm; }
+  @page{ size: A4 portrait; margin:8mm; }
+  *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important; }
   body{background:#fff;}
   .app{box-shadow:none; max-width:100%; border-radius:0; margin:0;}
   .ribbon, footer.note, #screenRoot, .no-print{display:none !important;}
-  #printArea{display:block !important; padding:0 6px;}
-  #printArea table.report, #printArea table.ledger{font-size:11px;}
+  #printArea{display:block !important; padding:0;}
+  #printArea .table-wrap{overflow:visible;}
+
+  /* Compact but clearly readable grid. Numeric/mark columns are at most
+     3 digits (max 100) so they stay narrow on their own; the Name column
+     is given a capped width and wraps onto a second line instead of
+     forcing the table wider than the page. */
+  #printArea table.report, #printArea table.ledger{
+    font-size:12px; min-width:0; width:100%;
+    border-radius:0; overflow:visible; border:1.3px solid #000 !important;
+  }
+  #printArea table.report th, #printArea table.ledger th{
+    font-size:9.5px; padding:5px 4px; border:1px solid #000 !important; line-height:1.2;
+  }
+  #printArea table.report td, #printArea table.ledger td{
+    font-size:12px; padding:4px 5px; border:1px solid #000 !important; line-height:1.25;
+  }
+  /* Other report tables (subject stats, distributions): first column
+     (Subject name) wraps if long, everything else stays single-line. */
+  #printArea table.report td.left, #printArea table.report th.left{
+    max-width:100px; font-size:10.5px; white-space:normal; word-break:break-word; text-align:left;
+  }
+  #printArea table.report td:not(.left){ white-space:nowrap; }
+  #printArea table.ledger td.name-cell, #printArea table.ledger th.name-cell{
+    max-width:100px; font-size:10.5px; white-space:normal; word-break:break-word; text-align:left;
+  }
+  #printArea table.ledger td:not(.name-cell):not(.reg-cell){ white-space:nowrap; }
+  #printArea table.ledger td.reg-cell{font-size:10.5px;}
+
+  /* Consolidated Marksheet: Reg. No. and Name always stay on one line
+     (auto-sized to their content, never wrapped/shrunk); every subject
+     column gets an equal share of the width (set inline per-table since
+     the subject count varies per group); subject headings wrap onto two
+     lines when the subject name is long; Total is just wide enough for
+     4 digits since marks max out at 100 (3 digits). */
+  #printArea #consolidatedTable td.left, #printArea #consolidatedTable th.left{
+    max-width:none; white-space:nowrap; word-break:normal; font-size:11px;
+  }
+  #printArea #consolidatedTable th.rank-col, #printArea #consolidatedTable td.rank-cell,
+  #printArea #consolidatedTable th.reg-col, #printArea #consolidatedTable td.reg-cell,
+  #printArea #consolidatedTable th.result-col, #printArea #consolidatedTable td.result-cell{
+    white-space:nowrap; width:1%;
+  }
+  #printArea #consolidatedTable th.name-col, #printArea #consolidatedTable td.name-cell{
+    white-space:nowrap; font-size:11px;
+  }
+  #printArea #consolidatedTable th.subj-col{
+    white-space:normal; word-break:break-word; line-height:1.15; font-size:9px;
+  }
+  #printArea #consolidatedTable td.subj-cell{ white-space:nowrap; }
+  #printArea #consolidatedTable th.total-col, #printArea #consolidatedTable td.total-cell{
+    width:4ch; white-space:nowrap;
+  }
+
   #printArea .section-block, #printArea .stat-cards{break-inside:avoid; page-break-inside:avoid;}
   #printArea .stamp{border-width:1.5px;}
   #printArea .link-count{color:inherit; text-decoration:none; cursor:default; pointer-events:none; font-weight:700;}
@@ -1252,12 +1306,12 @@ function sortMarksheet(marksheet, mode){
 function buildMarksheetRows(marksheet){
   return marksheet.map(st => `
       <tr>
-        <td class="left">${st.rank || '&mdash;'}</td>
+        <td class="left rank-cell">${st.rank || '&mdash;'}</td>
         <td class="reg-cell left">${st.regno}</td>
-        <td class="left">${st.name}</td>
-        ${st.subjects.map(sub => `<td>${sub.pass==='ABSENT' ? 'AA' : (sub.total ?? '&mdash;')}</td>`).join('')}
-        <td><strong>${st.total ?? '&mdash;'}</strong></td>
-        <td><span class="stamp ${st.status}">${st.status}</span></td>
+        <td class="left name-cell">${st.name}</td>
+        ${st.subjects.map(sub => `<td class="subj-cell" style="width:${(46/(st.subjects.length||1)).toFixed(2)}%">${sub.pass==='ABSENT' ? 'AA' : (sub.total ?? '&mdash;')}</td>`).join('')}
+        <td class="total-cell"><strong>${st.total ?? '&mdash;'}</strong></td>
+        <td class="result-cell"><span class="stamp ${st.status}">${st.status}</span></td>
       </tr>`).join('');
 }
 
@@ -1296,7 +1350,10 @@ function renderAnalysisBody(groupCode, examCode){
 
   const marksheetRows = buildMarksheetRows(sortMarksheet(a.marksheet, ANALYSIS_SORT));
 
-  const subjectHeaders = a.subjects.map(s=>`<th>${s}</th>`).join('');
+  // Subjects share the width left over after Rank/Reg.No/Name/Total/Result
+  // take what they need, split equally regardless of subject count.
+  const subjColPct = (46 / (a.subjects.length || 1)).toFixed(2);
+  const subjectHeaders = a.subjects.map(s=>`<th class="subj-col" style="width:${subjColPct}%">${s}</th>`).join('');
   const grandMax = a.subjectStats.reduce((sum, s) => sum + (Number(s.totalMarks) || 0), 0);
 
   const bandLabels = ['=100','>=80 And <100','>=70 And <80','>=60 And <70','>=50 And <60','>=40 And <50','>=35 And <40','<35'];
@@ -1352,8 +1409,8 @@ function renderAnalysisBody(groupCode, examCode){
         <button class="${ANALYSIS_SORT==='rank'?'active':''}" data-sort="rank" onclick="setAnalysisSort('rank')">Rank wise</button>
       </div>
       <div class="table-wrap">
-        <table class="report">
-          <thead><tr><th>Rank</th><th>Reg. No.</th><th class="left">Name</th>${subjectHeaders}<th>Total (${grandMax})</th><th>Result</th></tr></thead>
+        <table class="report" id="consolidatedTable">
+          <thead><tr><th class="rank-col">Rank</th><th class="reg-col">Reg. No.</th><th class="left name-col">Name</th>${subjectHeaders}<th class="total-col">Total (${grandMax})</th><th class="result-col">Result</th></tr></thead>
           <tbody id="consolidatedMarksheetBody">${marksheetRows}</tbody>
         </table>
       </div>
