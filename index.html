@@ -115,9 +115,8 @@ p.lede{color:var(--text-soft); margin:0 0 32px; max-width:640px; line-height:1.5
 .index-card .arrow{position:absolute; right:18px; bottom:18px; color:var(--brass); font-size:18px; font-weight:700;}
 
 /* ---------- Choice cards (mode / subject picks) ---------- */
-.choice-row{display:flex; gap:18px; flex-wrap:wrap;}
+.choice-row{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
 .choice-card{
-  flex:1 1 260px;
   background:var(--paper); border:1px solid var(--rule); border-radius:16px; padding:24px;
   cursor:pointer; box-shadow:0 2px 10px rgba(31,41,55,.05);
   transition:box-shadow .15s ease, border-color .15s ease, transform .15s ease;
@@ -312,7 +311,7 @@ footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-
   .index-card{ padding:16px 16px 40px; }
   .index-card .arrow{ right:14px; bottom:14px; }
 
-  .choice-row{ flex-direction:column; gap:14px; }
+  .choice-row{ grid-template-columns:1fr; gap:14px; }
   .choice-card{ padding:18px; }
 
   .subject-grid{ grid-template-columns:1fr 1fr; gap:10px; }
@@ -404,11 +403,23 @@ const CLASSES = {
     groupWord: 'Group',
     apiUrl: "https://script.google.com/macros/s/AKfycbzZuGBdrFJy0PLLysKk0rh6bi3OZ42r888ZvwX5RHUOr_E087qvUHnRIaNvDgZSyRGz/exec"
   },
+  '11': {
+    label: '11th Standard',
+    sub: 'Higher Secondary',
+    groupWord: 'Group',
+    apiUrl: "https://script.google.com/macros/s/AKfycbzG5xS327e43Kr5YEJWSSwF-5lNv3gHrAnGWihO8xhH-yBHDBJZ5HrS6Cajwrj4Y6XzNQ/exec"
+  },
   '10': {
     label: '10th Standard',
     sub: 'Secondary Education (SSLC)',
     groupWord: 'Section',
     apiUrl: "https://script.google.com/macros/s/AKfycbxIIxrx1LNukcRpzAdob_4Zy1aLKxClC9h1NB-d0BeD7jA21W1JSfx27kCKdc91Nr9ELw/exec"
+  },
+  '9': {
+    label: '9th Standard',
+    sub: 'Secondary Education',
+    groupWord: 'Section',
+    apiUrl: "https://script.google.com/macros/s/AKfycbzX0QpuJu9TMIv9HsnpyWmJQ8NlF2PDfpayQjnWnhW9sxa60oNmcuusrUNN7Y5bhl28/exec"
   }
 };
 const SCHOOL_NAME = "Govt. Boys Higher Secondary School, Podaturpet-631208";
@@ -506,6 +517,16 @@ function renderClassSelect(){
           <div class="tag">Secondary (SSLC)</div>
           <h3>10th Standard</h3>
           <p>Sections 10-A to 10-E &mdash; Tamil, English, Mathematics, Science and Social Science.</p>
+        </div>
+        <div class="choice-card" onclick="selectClass('11')">
+          <div class="tag">Higher Secondary</div>
+          <h3>11th Standard</h3>
+          <p>Same groups as 12th, with its own subject teachers, marks entry, and result analysis.</p>
+        </div>
+        <div class="choice-card" onclick="selectClass('9')">
+          <div class="tag">Secondary</div>
+          <h3>9th Standard</h3>
+          <p>Same sections and subjects as 10th Standard, with its own subject teachers and marks.</p>
         </div>
       </div>
     </div>`;
