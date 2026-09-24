@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Examination Result Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#1e1b4b;
@@ -97,10 +97,11 @@ p.lede{color:var(--text-soft); margin:0 0 32px; max-width:640px; line-height:1.5
   box-shadow:0 2px 10px rgba(31,41,55,.06);
   transition:transform .15s ease, box-shadow .15s ease;
 }
-.index-card:nth-child(4n+1){border-top-color:var(--brass);}
-.index-card:nth-child(4n+2){border-top-color:var(--accent2);}
-.index-card:nth-child(4n+3){border-top-color:var(--accent3);}
-.index-card:nth-child(4n+4){border-top-color:var(--accent4);}
+/* per-group colour comes from --c / --d set inline in renderHome() */
+.index-card{border-top-color:var(--c, var(--brass));}
+.index-card .code{color:var(--d, var(--brass-deep));}
+.index-card .arrow{color:var(--c, var(--brass));}
+.index-card:hover{box-shadow:0 16px 32px rgba(31,41,55,.18);}
 .index-card:hover{
   transform:translateY(-4px);
   box-shadow:0 16px 32px rgba(124,58,237,.22);
@@ -184,7 +185,8 @@ table.ledger tbody td{
   padding:7px 8px; border-bottom:1px solid var(--rule); border-right:1px solid #f1f0fb; text-align:center;
 }
 table.ledger tbody tr:nth-child(odd){background:#faf9ff;}
-table.ledger td.name-cell{text-align:left; font-family:var(--sans); font-size:13.5px;}
+table.ledger thead th.left{text-align:left; padding-left:12px;}
+table.ledger td.name-cell{padding-left:12px;text-align:left; font-family:var(--sans); font-size:13.5px;}
 table.ledger td.reg-cell{font-family:var(--mono); font-size:12.5px;}
 table.ledger input{
   width:64px; text-align:center; padding:6px 4px; border:1px solid var(--rule); border-radius:8px; font-family:var(--mono); font-size:13px;
@@ -216,7 +218,7 @@ table.report{width:100%; border-collapse:collapse; font-size:13px; background:#f
 table.report th{background:linear-gradient(120deg, var(--ink), var(--ink-2)); color:#fff; padding:8px 10px; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; text-align:center;}
 table.report td{padding:7px 10px; border-bottom:1px solid var(--rule); text-align:center;}
 table.report tbody tr:nth-child(odd){background:#faf9ff;}
-table.report td.left{text-align:left;}
+table.report td.left, table.report th.left{text-align:left;}
 
 .stamp{
   display:inline-flex; align-items:center; justify-content:center;
@@ -355,18 +357,67 @@ footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-
 .print-banner{text-align:center; margin-bottom:20px; padding-bottom:14px; border-bottom:2px solid var(--ink);}
 .print-banner h2{font-family:var(--serif); font-size:22px; margin:0 0 6px; color:var(--ink);}
 .print-banner .meta{font-family:var(--mono); font-size:11px; color:#444; margin-top:2px;}
+/* Page box: top/bottom 14mm. Left/right binding margins are applied as padding on #printArea (see below)
+   so they hold even if the browser print dialog overrides the @page side margins. */
+@page{ size: A4 portrait; margin:14mm 0; }
 @media print{
-  @page{ size: A4 portrait; margin:14mm; }
+  html, body{margin:0 !important; padding:0 !important;}
   body{background:#fff;}
   .app{box-shadow:none; max-width:100%; border-radius:0; margin:0;}
   .ribbon, footer.note, #screenRoot, .no-print{display:none !important;}
-  #printArea{display:block !important; padding:0 6px;}
+  #printArea{display:block !important; box-sizing:border-box; padding:0 12.7mm 0 25.4mm !important;}  /* left 1 inch (binding), right 0.5 inch */
+  #printArea .table-wrap{overflow:visible !important;}
+  #printArea table.report{min-width:0 !important; width:100%;}
+  /* wrapped column headings: long names break onto extra lines so columns can stay narrow */
+  #printArea table.report.fit-heads th{
+    white-space:normal; overflow-wrap:anywhere; word-break:break-word;
+    font-size:8.5px; letter-spacing:0; line-height:1.25; padding:6px 2px;
+  }
+  #printArea table.report.fit-heads td{padding:6px 3px; font-size:10.5px;}
   #printArea table.report, #printArea table.ledger{font-size:11px;}
   #printArea .section-block, #printArea .stat-cards{break-inside:avoid; page-break-inside:avoid;}
   #printArea .stamp{border-width:1.5px;}
   #printArea .link-count{color:inherit; text-decoration:none; cursor:default; pointer-events:none; font-weight:700;}
   #printArea .detail-row, #printArea .detail-panel{display:none !important;}
 }
+
+/* ---------- Colour-coded buttons (examination / group / section) ---------- */
+.group-select-row button.tint, .exam-pill-row button.tint{
+  background:var(--t); color:var(--d); border:1.5px solid var(--c);
+}
+.group-select-row button.tint:hover, .exam-pill-row button.tint:hover{filter:brightness(.96); box-shadow:0 4px 12px rgba(31,41,55,.14);}
+.group-select-row button.tint.active, .exam-pill-row button.tint.active{
+  background:linear-gradient(120deg, var(--c), var(--d)); color:#fff; border-color:var(--d);
+}
+.exam-pill-row button.tint small{color:var(--d); opacity:.85;}
+.exam-pill-row button.tint.active small{color:rgba(255,255,255,.9); opacity:1;}
+
+/* ---------- Report first page: row-wise summary tables ---------- */
+table.summary{width:100%; max-width:560px; border-collapse:separate; border-spacing:0; background:#fff; border:2px solid var(--ink); border-radius:12px; overflow:hidden;}
+table.summary th{background:var(--c); color:#fff; text-align:left; padding:12px 18px; font-size:15px; width:55%; border-bottom:1px solid rgba(255,255,255,.35);}
+table.summary td{text-align:center; padding:12px 18px; font-size:22px; font-family:var(--mono); border-bottom:1px solid var(--rule);}
+table.summary tr:last-child th, table.summary tr:last-child td{border-bottom:none;}
+table.report.big{font-size:15px;}
+table.report.big th{font-size:12px; padding:11px 10px;}
+table.report.big td{padding:11px 10px;}
+table.report tr.top-1 td{background:#fef3c7;}
+table.report tr.top-2 td{background:#e5e7eb;}
+table.report tr.top-3 td{background:#ffedd5;}
+table.summary, table.report{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+@media print{ .summary-page{break-after:page; page-break-after:always;} }
+
+/* ---------- Colourful class cards (landing page) ---------- */
+.choice-card.class-card{
+  background:var(--t); border:1.5px solid var(--c); border-top:6px solid var(--c);
+}
+.choice-card.class-card .tag{background:var(--c); color:#fff;}
+.choice-card.class-card h3{color:var(--d);}
+.choice-card.class-card p{color:var(--text);}
+.choice-card.class-card:hover{border-color:var(--d); box-shadow:0 16px 30px rgba(31,41,55,.2);}
+
+/* ---------- Bold type throughout (layout / sizes unchanged) ---------- */
+*, *::before, *::after{font-weight:700 !important;}
+.ribbon nav button, .btn{white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -443,6 +494,37 @@ function examLabel(code){
    internal-marks component) skip that field entirely. */
 function subjectHasInternal(s){ return !!(s.internalMax && Number(s.internalMax) > 0); }
 
+/* ---------------- button colours ---------------- */
+// c = main colour, d = darker shade (text / active gradient), t = light tint (background)
+const EXAM_COLORS = [
+  {c:'#2563eb', d:'#1e40af', t:'#eff6ff'},  // First Midterm
+  {c:'#0d9488', d:'#115e59', t:'#f0fdfa'},  // Quarterly
+  {c:'#9333ea', d:'#6b21a8', t:'#faf5ff'},  // Second Mid Term
+  {c:'#e11d48', d:'#9f1239', t:'#fff1f2'},  // Half-Yearly
+  {c:'#d97706', d:'#92400e', t:'#fffbeb'},  // First Revision
+  {c:'#059669', d:'#065f46', t:'#ecfdf5'}   // Second Revision
+];
+const GROUP_COLORS = [
+  {c:'#4f46e5', d:'#3730a3', t:'#eef2ff'},
+  {c:'#0891b2', d:'#155e75', t:'#ecfeff'},
+  {c:'#db2777', d:'#9d174d', t:'#fdf2f8'},
+  {c:'#ea580c', d:'#9a3412', t:'#fff7ed'},
+  {c:'#16a34a', d:'#166534', t:'#f0fdf4'},
+  {c:'#7c3aed', d:'#5b21b6', t:'#f5f3ff'},
+  {c:'#65a30d', d:'#3f6212', t:'#f7fee7'},
+  {c:'#2563eb', d:'#1e40af', t:'#eff6ff'}
+];
+const CLASS_COLORS = {
+  '12': {c:'#4f46e5', d:'#3730a3', t:'#eef2ff'},  // indigo
+  '11': {c:'#0d9488', d:'#115e59', t:'#f0fdfa'},  // teal
+  '10': {c:'#ea580c', d:'#9a3412', t:'#fff7ed'},  // orange
+  '9':  {c:'#db2777', d:'#9d174d', t:'#fdf2f8'}   // pink
+};
+const OVERALL_COLOR = {c:'#334155', d:'#1e293b', t:'#f1f5f9'};
+function colorStyle(o){ return `--c:${o.c};--d:${o.d};--t:${o.t};`; }
+function examColor(i){ return EXAM_COLORS[i % EXAM_COLORS.length]; }
+function groupColor(i){ return GROUP_COLORS[i % GROUP_COLORS.length]; }
+
 /* ---------------- state ---------------- */
 let CURRENT_CLASS = null;   // '12' | '10' — which standard/sheet is active
 let CONFIGS = {};           // per-class config cache: {'12': {groups:[...]}, '10': {...}}
@@ -508,22 +590,22 @@ function renderClassSelect(){
       <h2 class="title">Which class are you working with?</h2>
       <p class="lede">Each standard keeps its own students, subjects, and result records.</p>
       <div class="choice-row">
-        <div class="choice-card" onclick="selectClass('12')">
+        <div class="choice-card class-card" style="${colorStyle(CLASS_COLORS['12'])}" onclick="selectClass('12')">
           <div class="tag">Higher Secondary</div>
           <h3>12th Standard</h3>
           <p>Group-wise subject combinations, marks entry, and consolidated result analysis.</p>
         </div>
-        <div class="choice-card" onclick="selectClass('10')">
+        <div class="choice-card class-card" style="${colorStyle(CLASS_COLORS['10'])}" onclick="selectClass('10')">
           <div class="tag">Secondary (SSLC)</div>
           <h3>10th Standard</h3>
           <p>Sections 10-A to 10-E &mdash; Tamil, English, Mathematics, Science and Social Science.</p>
         </div>
-        <div class="choice-card" onclick="selectClass('11')">
+        <div class="choice-card class-card" style="${colorStyle(CLASS_COLORS['11'])}" onclick="selectClass('11')">
           <div class="tag">Higher Secondary</div>
           <h3>11th Standard</h3>
           <p>Same groups as 12th, with its own subject teachers, marks entry, and result analysis.</p>
         </div>
-        <div class="choice-card" onclick="selectClass('9')">
+        <div class="choice-card class-card" style="${colorStyle(CLASS_COLORS['9'])}" onclick="selectClass('9')">
           <div class="tag">Secondary</div>
           <h3>9th Standard</h3>
           <p>Same sections and subjects as 10th Standard, with its own subject teachers and marks.</p>
@@ -537,10 +619,10 @@ async function renderHome(){
   root.innerHTML = `<div class="screen"><div class="loading">Loading groups…</div></div>`;
   const cfg = await ensureConfig();
   const cls = CLASSES[CURRENT_CLASS];
-  const examPills = EXAMS.map(e => `
-    <button class="${e.code===CURRENT_EXAM?'active':''}" data-exam="${e.code}" onclick="selectHomeExam('${e.code}')">${e.name}<br><small style="font-weight:400;">${e.period}</small></button>`).join('');
-  const cards = cfg.groups.map(g => `
-    <div class="index-card" onclick="renderModePicker('${g.code}')">
+  const examPills = EXAMS.map((e,i) => `
+    <button class="tint ${e.code===CURRENT_EXAM?'active':''}" style="${colorStyle(examColor(i))}" data-exam="${e.code}" onclick="selectHomeExam('${e.code}')">${e.name}<br><small>${e.period}</small></button>`).join('');
+  const cards = cfg.groups.map((g,gi) => `
+    <div class="index-card" style="${colorStyle(groupColor(gi))}" onclick="renderModePicker('${g.code}')">
       <div class="code">${g.code}</div>
       <h3>${g.name}</h3>
       ${g.medium ? `<div class="medium-tag">${g.medium} Medium</div>` : ''}
@@ -791,7 +873,7 @@ async function renderMarksEntry(subjectName){
         <table class="ledger">
           <thead>
             <tr>
-              <th>Reg. No.</th><th>Student Name</th>
+              <th>Reg. No.</th><th class="left">Student Name</th>
               ${s.hasTheory ? `<th>Theory (${s.theoryMax})</th>` : ''}
               ${s.hasPractical ? `<th>Practical (${s.practicalMax})</th>` : ''}
               ${subjectHasInternal(s) ? `<th>Internal (${s.internalMax})</th>` : ''}
@@ -865,7 +947,7 @@ function downloadSubjectMarksheet(){
 
   const marksheetRows = rowsData
     .slice()
-    .sort((a,b)=> (rankMap[a.regno] ?? 99999) - (rankMap[b.regno] ?? 99999))
+    .sort((a,b)=> String(a.regno).localeCompare(String(b.regno), undefined, {numeric:true, sensitivity:'base'}))
     .map(r => `
       <tr>
         <td class="left">${rankMap[r.regno] ?? '&mdash;'}</td>
@@ -878,15 +960,26 @@ function downloadSubjectMarksheet(){
         <td><span class="stamp ${r.status}">${r.resultLabel}</span></td>
       </tr>`).join('');
 
-  const overallCards = `
-    <div class="stat-cards">
-      <div class="stat-card"><div class="num">${totalStudents}</div><div class="lbl">Total Students</div></div>
-      <div class="stat-card"><div class="num">${absentList.length}</div><div class="lbl">Absent</div></div>
-      <div class="stat-card"><div class="num">${appeared}</div><div class="lbl">Appeared</div></div>
-      <div class="stat-card"><div class="num">${passed}</div><div class="lbl">Passed</div></div>
-      <div class="stat-card"><div class="num">${failed}</div><div class="lbl">Failed</div></div>
-      <div class="stat-card"><div class="num">${passPct}%</div><div class="lbl">Pass Percentage</div></div>
-    </div>`;
+  const topRowsSubj = ranked.filter(r => rankMap[r.regno] <= 3).map(r => `
+      <tr class="${topRowClass(rankMap[r.regno])}">
+        <td>${rankMap[r.regno]}</td>
+        <td class="reg-cell">${r.regno}</td>
+        <td class="left">${r.name}</td>
+        ${s.hasTheory ? `<td>${r.theory || '&mdash;'}</td>` : ''}
+        ${s.hasPractical ? `<td>${r.practical || '&mdash;'}</td>` : ''}
+        ${subjectHasInternal(s) ? `<td>${r.internal || '&mdash;'}</td>` : ''}
+        <td>${r.totalDisplay}</td>
+      </tr>`).join('');
+  const summaryPage = buildSummaryPage({
+    stats: {total: totalStudents, appeared, absent: absentList.length, passed, failed, passPct},
+    avgHead: '<th class="left">Subject</th><th>Max Marks</th><th>Average</th><th>Highest</th><th>Lowest</th>',
+    avgRows: `<tr><td class="left">${CURRENT_SUBJECT}</td><td>${subjectMax}</td><td>${average}</td><td>${highest}</td><td>${lowest}</td></tr>`,
+    topHead: `<th>Rank</th><th>Reg. No.</th><th class="left">Name</th>
+      ${s.hasTheory ? `<th>Theory (${s.theoryMax})</th>` : ''}
+      ${s.hasPractical ? `<th>Practical (${s.practicalMax})</th>` : ''}
+      ${subjectHasInternal(s) ? `<th>Internal (${s.internalMax})</th>` : ''}<th>Total (${subjectMax})</th>`,
+    topRows: topRowsSubj
+  });
 
   const pendingNote = pendingList.length
     ? `<p style="font-family:var(--mono); font-size:11px; color:var(--fail); margin-top:6px;">${pendingList.length} student(s) still have incomplete entries and are excluded from the statistics below.</p>`
@@ -900,16 +993,16 @@ function downloadSubjectMarksheet(){
       <div class="meta">Entered by: ${SESSION.teacherName} &middot; Printed: ${new Date().toLocaleString()}</div>
     </div>
 
-    ${overallCards}
+    ${summaryPage}
     ${pendingNote}
 
     <div class="section-block">
       <h3>${CURRENT_SUBJECT} &mdash; Marksheet</h3>
-      <p class="note">Result per student for this subject. Absent students are excluded from pass/fail; rank is given only to students who passed.</p>
+      <p class="note">Result per student for this subject. Students are listed in Reg. No. order; absent students are excluded from pass/fail, and rank is given only to students who passed.</p>
       <div class="table-wrap">
         <table class="report">
           <thead><tr>
-            <th>Rank</th><th>Reg. No.</th><th class="left">Name</th>
+            <th class="left">Rank</th><th class="left">Reg. No.</th><th class="left">Name</th>
             ${s.hasTheory ? `<th>Theory (${s.theoryMax})</th>` : ''}
             ${s.hasPractical ? `<th>Practical (${s.practicalMax})</th>` : ''}
             ${subjectHasInternal(s) ? `<th>Internal (${s.internalMax})</th>` : ''}<th>Total (${subjectMax})</th><th>Result</th>
@@ -922,7 +1015,7 @@ function downloadSubjectMarksheet(){
     <div class="section-block">
       <h3>Subject Statistics</h3>
       <div class="table-wrap">
-        <table class="report">
+        <table class="report fit-heads">
           <thead><tr><th class="left">Subject</th><th>Total</th><th>Absent</th><th>Appeared</th><th>Passed</th><th>Failed</th><th>Pass %</th><th>Max Marks</th><th>Highest</th><th>Lowest</th><th>Average</th></tr></thead>
           <tbody><tr>
             <td class="left">${CURRENT_SUBJECT}</td>
@@ -948,6 +1041,38 @@ function downloadSubjectMarksheet(){
       Note: this analysis is generated from marks as currently entered on screen. The official consolidated result is finalised in Result Analysis once all subjects for the group are submitted.
     </p>`;
   window.print();
+}
+
+/* ---------------- report first page (summary / average / top 3) ---------------- */
+function summaryStatsTable(st, passLabel){
+  const rows = [
+    ['Total Students', st.total, '#4338ca'],
+    ['Appeared', st.appeared, '#0891b2'],
+    ['Absent', st.absent, '#d97706'],
+    [passLabel || 'Passed', st.passed, '#16a34a'],
+    ['Failed', st.failed, '#dc2626'],
+    ['Pass Percentage', st.passPct + '%', '#7c3aed']
+  ];
+  return `<table class="summary"><tbody>${rows.map(r =>
+    `<tr><th style="--c:${r[2]}">${r[0]}</th><td style="color:${r[2]};">${r[1]}</td></tr>`).join('')}</tbody></table>`;
+}
+function topRowClass(rank){ return 'top-' + Math.min(Number(rank), 3); }
+function buildSummaryPage(c){
+  return `
+  <div class="summary-page">
+    <div class="section-block">
+      <h3>Result Summary</h3>
+      ${summaryStatsTable(c.stats, c.passLabel)}
+    </div>
+    <div class="section-block">
+      <h3>Subject Average</h3>
+      <div class="table-wrap"><table class="report big"><thead><tr>${c.avgHead}</tr></thead><tbody>${c.avgRows}</tbody></table></div>
+    </div>
+    <div class="section-block">
+      <h3>Top 3 Rank Holders</h3>
+      <div class="table-wrap"><table class="report big ${c.topClass || ''}"><thead><tr>${c.topHead}</tr></thead><tbody>${c.topRows || '<tr><td colspan="20" class="left">No passed students yet.</td></tr>'}</tbody></table></div>
+    </div>
+  </div>`;
 }
 
 /* ---------------- shared mark calculation ---------------- */
@@ -1070,8 +1195,8 @@ async function renderAnalysisPicker(){
   const cfg = await ensureConfig();
   ANALYSIS_GROUP = null;
   ANALYSIS_EXAM = null;
-  const examBtns = EXAMS.map(e=>`<button data-exam="${e.code}" onclick="selectAnalysisExam('${e.code}')">${e.name} &mdash; ${e.period}</button>`).join('');
-  const groupBtns = cfg.groups.map(g=>`<button data-group="${g.code}" onclick="selectAnalysisGroup('${g.code}')">${g.code}</button>`).join('');
+  const examBtns = EXAMS.map((e,i)=>`<button class="tint" style="${colorStyle(examColor(i))}" data-exam="${e.code}" onclick="selectAnalysisExam('${e.code}')">${e.name} &mdash; ${e.period}</button>`).join('');
+  const groupBtns = cfg.groups.map((g,gi)=>`<button class="tint" style="${colorStyle(groupColor(gi))}" data-group="${g.code}" onclick="selectAnalysisGroup('${g.code}')">${g.code}</button>`).join('');
   root.innerHTML = `
     <div class="screen">
       <div class="eyebrow">Result Analysis</div>
@@ -1081,7 +1206,7 @@ async function renderAnalysisPicker(){
       <div class="group-select-row" id="examSelectRow">${examBtns}</div>
       <div class="picker-label">Group</div>
       <div class="group-select-row" id="groupSelectRow">
-        <button data-group="__OVERALL__" onclick="selectAnalysisGroup('__OVERALL__')" style="border-color:var(--brass); color:var(--brass-deep); font-weight:700;">&#9733; Overall (All Sections)</button>
+        <button class="tint" style="${colorStyle(OVERALL_COLOR)}" data-group="__OVERALL__" onclick="selectAnalysisGroup('__OVERALL__')">&#9733; Overall (All Sections)</button>
         ${groupBtns}
       </div>
       <div id="analysisRoot"></div>
@@ -1335,6 +1460,26 @@ function renderAnalysisBody(groupCode, examCode){
       ${bandLabels.map(b=>`<td>${s.bands[b]}</td>`).join('')}
     </tr>`).join('');
 
+  const topStudents = a.marksheet.filter(st => st.rank !== '' && st.rank != null && Number(st.rank) <= 3)
+    .sort((x,y) => Number(x.rank) - Number(y.rank));
+  const topRowsCons = topStudents.map(st => `
+    <tr class="${topRowClass(st.rank)}">
+      <td>${st.rank}</td>
+      <td class="reg-cell">${st.regno}</td>
+      <td class="left">${st.name}</td>
+      ${st.subjects.map(sub => `<td>${sub.pass==='ABSENT' ? 'AA' : (sub.total ?? '&mdash;')}</td>`).join('')}
+      <td>${st.total ?? '&mdash;'}</td>
+    </tr>`).join('');
+  const summaryPage = buildSummaryPage({
+    stats: {total: o.totalStudents, appeared: o.appeared, absent: o.absent, passed: o.passed, failed: o.failed, passPct: o.passPercentage},
+    passLabel: 'Passed (All Subjects)',
+    topClass: 'fit-heads',
+    avgHead: '<th class="left">Subject</th><th>Total Marks</th><th>Average</th><th>Highest</th><th>Lowest</th>',
+    avgRows: a.subjectStats.map(sb => `<tr><td class="left">${sb.subject}</td><td>${sb.totalMarks}</td><td>${sb.average}</td><td>${sb.highest}</td><td>${sb.lowest}</td></tr>`).join(''),
+    topHead: `<th>Rank</th><th>Reg. No.</th><th class="left">Name</th>${subjectHeaders}<th>Total (${grandMax})</th>`,
+    topRows: topRowsCons
+  });
+
   // "Number of Students Failed in N Subjects" — backend already excludes the
   // 0-subjects bucket. Each non-zero count is clickable to reveal names.
   const failDistKeys = Object.keys(a.failDistribution);
@@ -1363,7 +1508,7 @@ function renderAnalysisBody(groupCode, examCode){
     </div>
     <div id="reportCardsPanel" class="section-block no-print" style="display:none;"></div>
 
-    ${overallCards}
+    ${summaryPage}
 
     <div class="section-block">
       <h3>Consolidated Marksheet</h3>
@@ -1373,8 +1518,8 @@ function renderAnalysisBody(groupCode, examCode){
         <button class="${ANALYSIS_SORT==='rank'?'active':''}" data-sort="rank" onclick="setAnalysisSort('rank')">Rank wise</button>
       </div>
       <div class="table-wrap">
-        <table class="report">
-          <thead><tr><th>Rank</th><th>Reg. No.</th><th class="left">Name</th>${subjectHeaders}<th>Total (${grandMax})</th><th>Result</th></tr></thead>
+        <table class="report fit-heads">
+          <thead><tr><th class="left">Rank</th><th class="left">Reg. No.</th><th class="left">Name</th>${subjectHeaders}<th>Total (${grandMax})</th><th>Result</th></tr></thead>
           <tbody id="consolidatedMarksheetBody">${marksheetRows}</tbody>
         </table>
       </div>
@@ -1383,7 +1528,7 @@ function renderAnalysisBody(groupCode, examCode){
     <div class="section-block">
       <h3>Subject-wise Statistics</h3>
       <div class="table-wrap">
-        <table class="report">
+        <table class="report fit-heads">
           <thead><tr><th class="left">Subject</th><th>Total</th><th>Absent</th><th>Appeared</th><th>Passed</th><th>Failed</th><th>Pass %</th><th>Total Marks</th><th>Highest</th><th>Lowest</th><th>Average</th></tr></thead>
           <tbody>${subjectStatsRows}</tbody>
         </table>
