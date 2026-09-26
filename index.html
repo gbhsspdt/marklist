@@ -393,9 +393,9 @@ footer.note{padding:24px 48px; font-size:11.5px; color:var(--text-soft); border-
 .exam-pill-row button.tint.active small{color:rgba(255,255,255,.9); opacity:1;}
 
 /* ---------- Report first page: row-wise summary tables ---------- */
-table.summary{width:100%; max-width:560px; border-collapse:separate; border-spacing:0; background:#fff; border:2px solid var(--ink); border-radius:12px; overflow:hidden;}
-table.summary th{background:var(--c); color:#fff; text-align:left; padding:12px 18px; font-size:15px; width:55%; border-bottom:1px solid rgba(255,255,255,.35);}
-table.summary td{text-align:center; padding:12px 18px; font-size:22px; font-family:var(--mono); border-bottom:1px solid var(--rule);}
+table.summary{width:100%; max-width:520px; margin:0 auto; border-collapse:separate; border-spacing:0; background:#fff; border:1.5px solid var(--rule); border-radius:12px; overflow:hidden;}
+table.summary th{background:var(--t); color:var(--d); text-align:left; padding:13px 20px; font-size:14px; width:55%; border-bottom:1px solid var(--rule); border-right:1px solid var(--rule);}
+table.summary td{text-align:center; padding:13px 20px; font-size:21px; font-family:var(--mono); color:var(--d); border-bottom:1px solid var(--rule);}
 table.summary tr:last-child th, table.summary tr:last-child td{border-bottom:none;}
 table.report.big{font-size:15px;}
 table.report.big th{font-size:12px; padding:11px 10px;}
@@ -934,11 +934,12 @@ function downloadSubjectMarksheet(){
   // A failed student is excluded from ranking too, same as absent students.
   const rankableList = scoredList.filter(r=>r.status==='PASS');
   const ranked = rankableList.slice().sort((a,b)=> b.numericTotal - a.numericTotal);
-  let rank = 0, prevTotal = null, seen = 0;
+  // Dense ranking: students tied on marks share a rank, and the next distinct
+  // mark gets the very next rank number (1,1,2 — not 1,1,3).
+  let rank = 0, prevTotal = null;
   const rankMap = {};
   ranked.forEach(r=>{
-    seen++;
-    if (r.numericTotal !== prevTotal){ rank = seen; prevTotal = r.numericTotal; }
+    if (r.numericTotal !== prevTotal){ rank = rank + 1; prevTotal = r.numericTotal; }
     rankMap[r.regno] = rank;
   });
 
@@ -1060,7 +1061,7 @@ function topRowClass(rank){ return 'top-' + Math.min(Number(rank), 3); }
 function buildSummaryPage(c){
   return `
   <div class="summary-page">
-    <div class="section-block">
+    <div class="section-block" style="text-align:center;">
       <h3>Result Summary</h3>
       ${summaryStatsTable(c.stats, c.passLabel)}
     </div>
@@ -1385,6 +1386,19 @@ function downloadOverallPDF(examCode){
 /* Sorts the consolidated marksheet either by Register No. (default, natural
    alphanumeric order) or by Rank (students who passed, ranked lowest-first;
    everyone else — fail/absent/pending — has no rank and is listed after). */
+/* The backend gives each ranked student a rank with gaps after ties (1,1,3).
+   Recompute it here as dense ranking (1,1,2) — ties share a rank, and the
+   next distinct total gets the very next number, no rank skipped. */
+function recomputeDenseRanks(marksheet){
+  const ranked = marksheet.filter(st => st.rank !== '' && st.rank != null)
+    .slice().sort((a,b)=> Number(b.total) - Number(a.total));
+  let rank = 0, prevTotal = null;
+  ranked.forEach(st=>{
+    if (Number(st.total) !== prevTotal){ rank = rank + 1; prevTotal = Number(st.total); }
+    st.rank = rank;
+  });
+}
+
 function sortMarksheet(marksheet, mode){
   const rows = marksheet.slice();
   if (mode === 'rank'){
@@ -1420,6 +1434,7 @@ async function renderAnalysis(groupCode, examCode){
   target.innerHTML = `<div class="loading">Crunching the numbers…</div>`;
   const a = await apiGet('analysis', {group: groupCode, exam: examCode});
   if (a.error){ target.innerHTML = `<div class="loading">${a.error}</div>`; return; }
+  recomputeDenseRanks(a.marksheet);
   ANALYSIS_DATA = a;
   ANALYSIS_SORT = 'regno';
   renderAnalysisBody(groupCode, examCode);
