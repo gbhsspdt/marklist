@@ -844,9 +844,9 @@ async function renderMarksEntry(subjectName){
       <tr data-regno="${st.regno}">
         <td class="reg-cell">${st.regno}</td>
         <td class="name-cell">${st.name}</td>
-        ${s.hasTheory ? `<td><input type="text" class="m-theory" value="${ex.theory ?? ''}" placeholder="/${s.theoryMax}" oninput="recalcRow(this)" onkeydown="handleMarksEntryKeydown(event,this)"></td>` : ''}
-        ${s.hasPractical ? `<td><input type="text" class="m-practical" value="${ex.practical ?? ''}" placeholder="/${s.practicalMax}" oninput="recalcRow(this)" onkeydown="handleMarksEntryKeydown(event,this)"></td>` : ''}
-        ${subjectHasInternal(s) ? `<td><input type="text" class="m-internal" value="${ex.internal ?? ''}" placeholder="/${s.internalMax}" oninput="recalcRow(this)" onkeydown="handleMarksEntryKeydown(event,this)"></td>` : ''}
+        ${s.hasTheory ? `<td><input type="text" class="m-theory" value="${ex.theory ?? ''}" placeholder="/${s.theoryMax}" oninput="recalcRow(this)"></td>` : ''}
+        ${s.hasPractical ? `<td><input type="text" class="m-practical" value="${ex.practical ?? ''}" placeholder="/${s.practicalMax}" oninput="recalcRow(this)"></td>` : ''}
+        ${subjectHasInternal(s) ? `<td><input type="text" class="m-internal" value="${ex.internal ?? ''}" placeholder="/${s.internalMax}" oninput="recalcRow(this)"></td>` : ''}
         <td class="cell-total">${r.totalDisplay}</td>
         <td><span class="result-tag ${r.status}">${r.resultLabel}</span></td>
       </tr>`;
@@ -1138,24 +1138,6 @@ function recalcRowFromTr(tr){
 }
 function recalcRow(inputEl){ recalcRowFromTr(inputEl.closest('tr')); }
 
-/* Pressing Enter in a marks-entry cell moves the cursor straight down to the
-   SAME column in the next student's row (Theory -> next row's Theory, and
-   likewise for Practical/Internal), instead of submitting anything, so a
-   teacher entering only Theory marks can keep pressing Enter down the whole
-   column without reaching for the mouse. */
-function handleMarksEntryKeydown(event, inputEl){
-  if (event.key !== 'Enter') return;
-  event.preventDefault();
-  const currentTr = inputEl.closest('tr');
-  const nextTr = currentTr.nextElementSibling;
-  if (!nextTr) return;
-  const colClass = inputEl.classList.contains('m-theory') ? '.m-theory'
-    : inputEl.classList.contains('m-practical') ? '.m-practical'
-    : '.m-internal';
-  const nextInput = nextTr.querySelector(colClass);
-  if (nextInput){ nextInput.focus(); nextInput.select(); }
-}
-
 function applyAutofill(){
   const chk = document.getElementById('autofillChk');
   const s = window._currentSubjectDef;
@@ -1294,38 +1276,22 @@ function renderOverallAnalysisBody(examCode){
       <td>${t.passed}</td><td>${t.failed}</td><td>${t.passPercentage}%</td><td>${t.average}</td>
     </tr>`).join('');
 
-  // Group/Section-wise Result Analysis: one row per group with its own
-  // totals/appeared/passed/failed/pass% (from a.groupWise, returned by the
-  // backend) plus the 1..maxN subjects-failed breakdown (from
-  // a.groupFailWise, as before) in the same row. Falls back to just the
-  // fail-count columns if an older backend hasn't been redeployed with
-  // groupWise yet.
+  // Group-wise failed-students breakdown (1..maxN subjects failed), with a
+  // combined Total row across every group. Each non-zero count is clickable.
   const gfw = a.groupFailWise;
   const nList = Array.from({length: gfw.maxN}, (_, i) => i + 1);
   const failColHeaders = nList.map(n => `<th>${n} Subject${n>1?'s':''}</th>`).join('');
-  const groupWord = (CLASSES[CURRENT_CLASS] && CLASSES[CURRENT_CLASS].groupWord) || 'Group';
-  const groupWiseMap = {};
-  (a.groupWise || []).forEach(g => { groupWiseMap[g.groupCode] = g; });
-  const hasGroupWise = !!(a.groupWise && a.groupWise.length);
-
-  const groupAnalysisRows = gfw.groups.map(g => {
-    const gw = groupWiseMap[g.groupCode];
-    const statCells = hasGroupWise
-      ? `<td>${gw.totalStudents}</td><td>${gw.appeared}</td><td>${gw.passed}</td><td>${gw.failed}</td><td>${gw.passPercentage}%</td>`
-      : `<td colspan="5">&mdash;</td>`;
-    const failCells = nList.map(n => {
+  const groupFailRows = gfw.groups.map(g => {
+    const cells = nList.map(n => {
       const b = g.buckets[n];
       return `<td>${b.count>0 ? `<button class="link-count" onclick="toggleGroupFailDetail('${g.groupCode}', ${n})">${b.count}</button>` : b.count}</td>`;
     }).join('');
-    return `<tr><td class="left">${g.groupCode}${gw ? ` &mdash; ${gw.groupName}` : ''}</td>${statCells}${failCells}</tr>`;
+    return `<tr><td class="left">${g.groupCode}</td>${cells}</tr>`;
   }).join('');
   const totalFailCells = nList.map(n => {
     const b = gfw.totals[n];
     return `<td>${b.count>0 ? `<button class="link-count" onclick="toggleGroupFailDetail('__TOTAL__', ${n})">${b.count}</button>` : b.count}</td>`;
   }).join('');
-  const totalStatCells = hasGroupWise
-    ? `<td>${o.totalStudents}</td><td>${o.appeared}</td><td>${o.passed}</td><td>${o.failed}</td><td>${o.passPercentage}%</td>`
-    : `<td colspan="5">&mdash;</td>`;
 
   target.innerHTML = `
     <div class="eyebrow" style="margin-bottom:4px;">${examLabel(examCode)}</div>
@@ -1337,24 +1303,6 @@ function renderOverallAnalysisBody(examCode){
       <h3>Overall Consolidated Result &mdash; All Sections</h3>
       <p class="note">Combined abstract across every section of this class for this examination.</p>
       ${overallCards}
-    </div>
-
-    <div class="section-block">
-      <h3>${groupWord}-wise Result Analysis</h3>
-      <p class="note">Each ${groupWord.toLowerCase()}'s own totals, pass percentage and how many students failed 1 to ${gfw.maxN} subjects. Click a fail-count number to see those students.</p>
-      <div class="table-wrap">
-        <table class="report">
-          <thead><tr>
-            <th class="left">${groupWord}</th><th>Total</th><th>Appeared</th><th>Passed</th><th>Failed</th><th>Pass %</th>
-            ${failColHeaders}
-          </tr></thead>
-          <tbody>
-            ${groupAnalysisRows}
-            <tr style="font-weight:700;"><td class="left">Total</td>${totalStatCells}${totalFailCells}</tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="detail-panel" id="groupFailDetail"></div>
     </div>
 
     <div class="section-block">
@@ -1376,6 +1324,21 @@ function renderOverallAnalysisBody(examCode){
           <tbody>${teacherRows || '<tr><td colspan="9" class="left">No subject-teacher permissions found in the Teachers sheet.</td></tr>'}</tbody>
         </table>
       </div>
+    </div>
+
+    <div class="section-block">
+      <h3>Group-wise Failed Students (By No. of Subjects Failed)</h3>
+      <p class="note">Click a number to see the students in that bucket, along with the subjects they failed.</p>
+      <div class="table-wrap">
+        <table class="report">
+          <thead><tr><th class="left">Group</th>${failColHeaders}</tr></thead>
+          <tbody>
+            ${groupFailRows}
+            <tr style="font-weight:700;"><td class="left">Total</td>${totalFailCells}</tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="detail-panel" id="groupFailDetail"></div>
     </div>
   `;
 }
